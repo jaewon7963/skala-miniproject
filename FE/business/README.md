@@ -2,44 +2,19 @@
 
 사업계획서 검토 플랫폼의 프론트엔드입니다. **Vue 3 (script setup) + Vite + Vue Router + Pinia** 구성입니다.
 
-## 요구 사항
-
-- Node.js `^20.19.0` 또는 `>=22.12.0`
-
-## 시작하기
+## 실행
 
 ```bash
-cd FE/business
-cp .env.example .env   # 최초 1회 — 기본값(VITE_USE_MOCK=true)이면 BE 없이 바로 구동됩니다
 npm install
-npm run dev             # http://localhost:5173
+npm run dev      # http://localhost:5173
+npm run build
+npm run lint
 ```
-
-`.env` 는 `.gitignore` 대상이라 커밋되지 않습니다. 값을 바꾸고 싶으면 `.env.example` 을 참고해 직접 수정하세요.
-
-## 스크립트
-
-| 명령 | 설명 |
-|---|---|
-| `npm run dev` | 개발 서버 실행 (`http://localhost:5173`) |
-| `npm run build` | 프로덕션 빌드 (`dist/`) |
-| `npm run preview` | 빌드 결과 로컬 미리보기 |
-| `npm run lint` | oxlint + eslint 자동 수정 |
-| `npm run format` | prettier로 `src/` 포맷팅 |
-
-## 환경 변수 (`.env`)
-
-| 변수 | 기본값 | 설명 |
-|---|---|---|
-| `VITE_USE_MOCK` | `true` | `true`=목업 데이터 사용(BE 불필요) · `false`=실제 API 호출 |
-| `VITE_API_BASE_URL` | `/api` | 프런트에서 호출하는 API 베이스 경로 |
-| `VITE_API_PROXY_TARGET` | `http://localhost:8081` | dev 서버 프록시 대상 (Spring Boot BE) |
-| `VITE_MOCK_LATENCY` | `350` | 목업 응답 지연(ms), 로딩 상태 확인용 |
 
 ## Mock ↔ 실제 백엔드 전환
 
 이 프로젝트의 화면은 **API 계약(JSON 구조)** 위에서 동작합니다.
-BE가 준비되면 `.env` 의 값 하나만 바꾸면 됩니다.
+BE가 준비되면 `.env.development` 의 값 하나만 바꾸면 됩니다.
 
 ```env
 VITE_USE_MOCK=false                          # true = Mock, false = 실제 API
