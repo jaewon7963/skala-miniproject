@@ -8,21 +8,47 @@
 
 ## 실행
 
+DB부터 띄운다.
+
 ```bash
 docker compose up -d postgres          # 저장소 루트에서
-cd BE/business && ./gradlew bootRun    # http://localhost:8081
 ```
 
-이미 로컬에 PostgreSQL을 띄워 쓰고 있어 5432 포트가 겹친다면, 도커를 쓰는 대신
-그 서버에 이 프로젝트용 롤과 DB만 만들어도 된다.
+이미 로컬에 PostgreSQL이 5432를 쓰고 있다면 도커 대신 그 서버에 롤과 DB만 만들어도 된다.
 
 ```sql
 CREATE ROLE business LOGIN PASSWORD 'business';
 CREATE DATABASE business OWNER business;
 ```
 
-기본값은 로컬 개발용이며 환경변수로 덮어쓴다: `DB_URL` · `DB_USERNAME` · `DB_PASSWORD` ·
-`JWT_SECRET`(32바이트 이상) · `DOCUMENT_STORAGE_DIR`.
+### 비밀번호와 서명 키
+
+`spring.datasource.password` 와 `jwt.secret` 은 **기본값을 두지 않는다.** 설정 파일에 값을
+적어 두면 저장소에 그대로 남기 때문이다. 둘 중 편한 쪽으로 넣는다.
+
+**① 로컬 설정 파일** — 한 번 만들어 두면 그 뒤로는 신경 쓸 게 없다.
+
+`src/main/resources/application-local.properties` (`.gitignore` 되어 커밋되지 않는다)
+
+```properties
+spring.datasource.password=business
+jwt.secret=bizxray-local-development-secret-key-32b
+```
+
+```bash
+cd BE/business && ./gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+**② 환경변수** — CI나 배포에서 쓴다.
+
+```bash
+DB_PASSWORD=business JWT_SECRET='32바이트 이상 문자열' ./gradlew bootRun
+```
+
+둘 다 없으면 기동 단계에서 placeholder 를 못 채워 실패한다.
+
+그 밖에 덮어쓸 수 있는 값: `DB_URL` · `DB_USERNAME` · `DOCUMENT_STORAGE_DIR`.
+`jwt.secret` 은 32바이트 이상이어야 하며, 짧으면 기동 시 거부한다.
 
 ## 프런트엔드와 함께 띄우기
 
@@ -88,4 +114,5 @@ PDF 업로드 → 페이지 텍스트 추출 → 제목·문단·표 블록으�
 ```
 
 DB를 쓰는 테스트는 Testcontainers로 PostgreSQL을 띄우므로 도커가 실행 중이어야 한다.
+테스트는 자체 설정으로 돌기 때문에 위의 비밀번호·서명 키 설정이 없어도 된다.
 `ReviewJobFlowIntegrationTest` 가 업로드부터 검토 완료·의견서까지를 화면이 부르는 순서 그대로 태운다.
