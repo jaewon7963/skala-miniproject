@@ -190,3 +190,81 @@ curl -H 'X-User-Id: 1' http://localhost:8081/api/review-jobs/1
 **후속 과제**
 - **개발자2에게 통보 필요.** 문서 목록의 `displayStatus` · `counts` 계산이 이 Port 를 기다린다.
   구현 없이 인터페이스만 먼저 올렸으니 소비자 쪽 컴파일은 지금부터 가능하다.
+
+---
+
+## S2 — Job 뼈대: API 16 · 17 · 18 + Port ③ 구현
+
+- 2026-09-03
+- 구현 범위: 분석 시작(16) · 분석 작업 조회(17) · 최근 분석 작업 조회(18) · `ReviewJobQueryPort` 구현.
+  AI 파이프라인은 아직 붙이지 않았다. `summary` 는 S3 에서 채운다.
+
+**추가**
+- `review/job/JobStatus.java` · `ReviewStatus.java` — `status` 와 `review_status` 를 별개 타입으로 분리 (D-1)
+- `review/job/ReviewJob.java` · `ReviewJobRepository.java`
+- `review/job/ReviewJobService.java` · `ReviewJobController.java`
+- `review/job/dto/CreateReviewJobRequest.java` · `ReviewJobResponse.java` · `JobSummaryView.java`
+- `review/port/ReviewJobQueryAdapter.java` — Port ③ 구현
+- `src/test/java/com/logiccheck/review/job/ReviewJobServiceTest.java` (12건)
+- `src/test/java/com/logiccheck/review/job/ReviewJobControllerTest.java` (9건)
+
+**변경**
+- `review/support/GlobalExceptionHandler.java` — Spring MVC 자체 예외 처리 보강 (아래 4번)
+
+**결정 · 편차**
+
+1. **선행 조건 3개를 모두 `DocumentQueryPort` 로만 확인한다.** `documents` 테이블을 직접 조회하지 않는다(D-2).
+   `parse_status != DONE` → 409 `DOCUMENT_NOT_READY`, 진행 중 Job → 409 `JOB_ALREADY_RUNNING`,
+   비소유자 → 403 `FORBIDDEN`.
+
+2. **Port 가 비소유자와 soft delete 를 구분하지 못한다.** `findMetaForOwner` 는 두 경우 모두
+   `Optional.empty()` 다. D-2 의 소유자 조건에 맞춰 **403 `FORBIDDEN` 으로 통일**했다.
+   삭제된 문서에 404 를 주려면 Port 시그니처가 바뀌어야 하므로 개발자2와 논의가 필요하다. **← 팀 확인 필요**
+
+3. **`saveAndFlush` + `DataIntegrityViolationException` → 409 변환.** 애플리케이션 검사만으로는
+   동시 요청을 막을 수 없어 `ux_review_jobs_active` 부분 유니크 인덱스가 최종 방어선이다(D-2).
+   즉시 flush 해야 제약 위반이 서비스 안에서 잡힌다.
+
+4. **`GlobalExceptionHandler` 에 Spring MVC 예외 처리를 추가했다.** `@ExceptionHandler(Exception.class)` 가
+   `NoResourceFoundException` 까지 삼켜 **없는 경로가 404 대신 500 으로 나갔다.**
+   Spring 7 의 `NoResourceFoundException` 은 `ErrorResponseException` 을 상속하지 않고
+   `org.springframework.web.ErrorResponse` 인터페이스만 구현하므로 타입 기반 `@ExceptionHandler` 로는
+   잡히지 않는다. `instanceof` 로 걸러 원래 상태 코드를 유지하게 했다.
+   경로 변수 타입 불일치 · 잘못된 JSON 본문도 400 으로 매핑했다.
+
+5. **`errorCode` 를 17번 응답에 포함했다.** D-10 이 실패 시 `error_code` 기록을 요구하고 FE 가
+   실패 사유를 표시해야 한다. DEV3 문서가 17번 응답 필드를 전량 열거하지 않아 판단으로 넣었다.
+   v2 명세 확인이 필요하다. **← 팀 확인 필요**
+
+6. **Port ③ 은 상관 서브쿼리 1회로 구현했다.** 단건 조회를 반복하면 개발자2의 문서 목록에서
+   N+1 이 발생한다(E-1). Job 이 없는 문서는 결과 Map 에 키가 없다 — 계약대로다.
+
+**검증**
+
+- `./gradlew test` — 21건 통과 (Service 12 · Controller 9), 실패 0
+- `ddl-auto=validate` 통과 — 엔티티 매핑이 `V20260904_1200` 스키마와 일치 (기동 성공)
+- 실제 Postgres 대상 curl E2E:
+
+  | 요청 | 결과 |
+  |---|---|
+  | `POST /api/review-jobs` | `202` · `Location: /api/review-jobs/4` · `status=PENDING` · `startedAt`·`finishedAt`·`rulesetVersion`·`summary` 모두 `null` |
+  | 같은 문서 재요청 | `409 JOB_ALREADY_RUNNING` |
+  | `GET /api/review-jobs/{id}` | `200` · `documentTitle`·`pageCount` 가 Port 에서 조합됨 · 래퍼 없음 |
+  | `GET /api/documents/1/review-jobs/latest` | `200` |
+  | `GET /api/documents/999/review-jobs/latest` | `404 NO_REVIEW_JOB` |
+  | `GET /api/review-jobs/999999` | `404 NOT_FOUND` |
+  | 인증 헤더 없음 | `401 UNAUTHORIZED` |
+  | `GET /api/review-jobs/abc` | `400 INVALID_REQUEST` |
+  | `GET /api/nope` | `404 NOT_FOUND` (수정 전 500) |
+  | `DELETE /api/review-jobs` | `405` |
+
+- **동시성**: 같은 문서에 동시 6건 요청 → `202` 1건, `409` 5건, DB 행 1건
+- **`terminal` 파생**: `status=DONE` 으로 바꾸면 `terminal: true`
+- **날짜 오프셋**: `started_at` 을 `2026-09-04 00:20:00+00` 로 저장 → 응답 `"2026-09-04T09:20:00+09:00"`
+- **Port ③ 쿼리 의미**: 문서 100·101 에 Job 2건, 102 에 1건, 999 에 0건인 상태에서
+  동등 SQL 실행 → 문서별 최신 1건만 반환, 999 는 결과에 없음
+
+**후속 과제**
+- Port ③ 은 개발자2가 소비할 때 통합 검증한다. 지금은 JPQL 부트스트랩 검증 + 동등 SQL 확인까지다
+- 삭제된 문서 접근 시 404 vs 403 (위 2번)
+- 17번 응답의 `errorCode` 포함 여부 (위 5번)
