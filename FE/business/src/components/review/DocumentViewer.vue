@@ -680,6 +680,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 .selection-action__menu .is-evidence { color: var(--c-finding-evidence); }
 .toolbar {
   height: 40px;
+  flex-wrap: nowrap;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -734,10 +735,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 .toolbar__total {
   font-size: var(--fs-sm);
   color: var(--c-text-muted);
+  white-space: nowrap;
 }
 .toolbar__section {
   font-size: var(--fs-sm);
   color: var(--c-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 좁아지면 현재 섹션 이름은 생략합니다 (목차·본문에서 확인 가능) */
+@media (max-width: 860px) {
+  .toolbar__section {
+    display: none;
+  }
 }
 
 .viewer__scroll {

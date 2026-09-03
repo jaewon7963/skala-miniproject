@@ -26,12 +26,26 @@ const renameTarget = ref(null)
 const renameValue = ref('')
 const deleteTarget = ref(null)
 
-const statusTabs = computed(() => [
-  { key: 'ALL', label: '전체 문서', count: counts.value.ALL ?? 0 },
-  { key: DOC_STATUS.REVIEWING, label: '검토 중', count: counts.value[DOC_STATUS.REVIEWING] ?? 0 },
-  { key: DOC_STATUS.DONE, label: '검토 완료', count: counts.value[DOC_STATUS.DONE] ?? 0 },
-  { key: DOC_STATUS.FAILED, label: '파싱 실패', count: counts.value[DOC_STATUS.FAILED] ?? 0 },
-])
+/**
+ * 좌측 상태 탭
+ * '전체 문서' 아래 항목의 합이 전체와 같아야 하므로, 처리 중 상태를 하나로 묶어 모두 노출합니다.
+ * (PARSING · ANALYZING 은 잠깐 지나가는 상태라 '처리 중' 으로 합칩니다)
+ */
+const statusTabs = computed(() => {
+  const at = (status) => counts.value[status] ?? 0
+  const processing = at(DOC_STATUS.PARSING) + at(DOC_STATUS.ANALYZING)
+
+  return [
+    { key: 'ALL', label: '전체 문서', count: counts.value.ALL ?? 0 },
+    { key: DOC_STATUS.IDLE, label: '미분석', count: at(DOC_STATUS.IDLE) },
+    ...(processing
+      ? [{ key: DOC_STATUS.PARSING, label: '처리 중', count: processing }]
+      : []),
+    { key: DOC_STATUS.REVIEWING, label: '검토 중', count: at(DOC_STATUS.REVIEWING) },
+    { key: DOC_STATUS.DONE, label: '검토 완료', count: at(DOC_STATUS.DONE) },
+    { key: DOC_STATUS.FAILED, label: '파싱 실패', count: at(DOC_STATUS.FAILED) },
+  ]
+})
 
 const periodOptions = Object.entries(DOC_PERIOD_LABEL).map(([value, label]) => ({ value, label }))
 const sortOptions = Object.entries(DOC_SORT_LABEL).map(([value, label]) => ({ value, label }))
@@ -298,9 +312,35 @@ async function submitDelete() {
 <style scoped>
 .library {
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--sidebar-w)) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
+}
+
+/* --- 좁은 폭 대응 : 표가 찌그러지기 전에 보조 정보를 먼저 줄입니다 --- */
+@media (max-width: 1080px) {
+  .library {
+    grid-template-columns: minmax(0, 176px) minmax(0, 1fr);
+    gap: 18px;
+  }
+  /* 태그 열 숨김 */
+  .table th:nth-child(2),
+  .table td:nth-child(2) {
+    display: none;
+  }
+}
+@media (max-width: 880px) {
+  /* 최근 수정 열 숨김 */
+  .table th:nth-child(4),
+  .table td:nth-child(4) {
+    display: none;
+  }
+  .main__head {
+    flex-wrap: wrap;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+  }
 }
 
 .btn-icon {

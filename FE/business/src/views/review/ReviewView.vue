@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { documentApi } from '@/api'
@@ -23,6 +23,25 @@ const review = useReviewStore()
 const { findings, decidedCount, loading, error, showEvidence, panelWidth, panelTab } =
   storeToRefs(review)
 const completing = ref(false)
+
+/* ---------------- 좁은 화면 대응 ----------------
+   원문 영역이 찌그러지지 않도록, 폭이 부족하면 목차를 접고 패널을 줄입니다. */
+const RAIL_W = 48
+const HANDLE_W = 5
+const MIN_VIEWER_W = 300
+const OUTLINE_BREAKPOINT = 1000
+
+const viewportWidth = ref(window.innerWidth)
+const showOutline = computed(() => viewportWidth.value >= OUTLINE_BREAKPOINT)
+
+function fitLayoutToViewport() {
+  viewportWidth.value = window.innerWidth
+
+  const handles = showOutline.value ? HANDLE_W * 2 : HANDLE_W
+  const used = (showOutline.value ? review.outlineWidth : 0) + RAIL_W + handles
+  const maxPanel = viewportWidth.value - used - MIN_VIEWER_W
+  if (review.panelWidth > maxPanel) review.setPanelWidth(maxPanel)
+}
 
 /* ---------------- 사이드바 너비 드래그 ---------------- */
 const resizing = ref(null)
@@ -59,6 +78,9 @@ function startResize(target, event) {
 const documentTitle = ref('문서')
 
 onMounted(async () => {
+  fitLayoutToViewport()
+  window.addEventListener('resize', fitLayoutToViewport)
+
   await review.load(props.jobId)
   if (review.job?.documentId) {
     const doc = applyName(await documentApi.get(review.job.documentId))
@@ -66,6 +88,7 @@ onMounted(async () => {
   }
 })
 onUnmounted(() => {
+  window.removeEventListener('resize', fitLayoutToViewport)
   stopResize?.()
   review.reset()
 })
@@ -109,9 +132,11 @@ async function complete() {
 
     <!-- 3분할 본문 -->
     <div class="body">
-      <SectionOutline />
+      <!-- 좁은 화면에서는 원문 영역을 지키기 위해 목차를 접습니다 -->
+      <SectionOutline v-if="showOutline" />
 
       <div
+        v-if="showOutline"
         class="resizer"
         :class="{ 'is-active': resizing === 'outline' }"
         role="separator"
@@ -241,6 +266,13 @@ async function complete() {
   flex: 1;
   min-height: 0;
   display: flex;
+}
+/* 문서 제목이 길어도 상단 바가 줄바꿈되지 않게 */
+.bar__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .panel {
   flex: none;

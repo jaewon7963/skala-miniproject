@@ -118,6 +118,10 @@
   --transition: var(--dur-fast) var(--ease-out);
 
   /* --- Layout --- */
+  /* 작업 화면(라이브러리 · 업로드 · 검토 등)의 최소 폭.
+     이보다 좁아지면 레이아웃을 더 줄이지 않고 가로 스크롤로 넘깁니다.
+     기준 화면 1440px 의 50% */
+  --app-min-w: 720px;
   --header-h: 52px;
   --sidebar-w: 216px;
   --outline-w: 248px;

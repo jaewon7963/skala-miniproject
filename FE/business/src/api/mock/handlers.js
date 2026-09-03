@@ -206,12 +206,14 @@ export const documents = {
       total,
       page,
       size,
-      counts: {
-        ALL: state.documents.length,
-        [DOC_STATUS.REVIEWING]: state.documents.filter((d) => d.status === DOC_STATUS.REVIEWING).length,
-        [DOC_STATUS.DONE]: state.documents.filter((d) => d.status === DOC_STATUS.DONE).length,
-        [DOC_STATUS.FAILED]: state.documents.filter((d) => d.status === DOC_STATUS.FAILED).length,
-      },
+      // 상태별 집계 : 모든 상태를 내려주므로 상태별 합 = ALL 이 됩니다
+      counts: Object.values(DOC_STATUS).reduce(
+        (acc, status) => {
+          acc[status] = state.documents.filter((d) => d.status === status).length
+          return acc
+        },
+        { ALL: state.documents.length },
+      ),
     }
   },
 
