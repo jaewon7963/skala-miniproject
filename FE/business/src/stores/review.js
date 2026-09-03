@@ -77,6 +77,7 @@ export const useReviewStore = defineStore('review', () => {
 
   /* 목록 상태 */
   const activeFindingId = ref(null)
+  const panelTab = ref('findings')
   const filterType = ref('ALL')
   const sort = ref(FINDING_SORT.CONFIDENCE_DESC)
   const undecidedOnly = ref(false)
@@ -142,6 +143,7 @@ export const useReviewStore = defineStore('review', () => {
       sections.value = sectionData
       pages.value = pageData
       findings.value = findingData
+      panelTab.value = 'findings'
       try {
         annotations.value = JSON.parse(localStorage.getItem(`logiccheck.annotations.${jobId}`) || '[]')
       } catch {
@@ -181,6 +183,7 @@ export const useReviewStore = defineStore('review', () => {
   function selectFinding(findingId, evidenceIndex = 0) {
     const finding = findings.value.find((f) => f.id === findingId)
     if (!finding) return
+    panelTab.value = 'findings'
     activeFindingId.value = findingId
     const evidence = finding.evidence?.[evidenceIndex]
     if (evidence) {
@@ -193,7 +196,10 @@ export const useReviewStore = defineStore('review', () => {
   /** 원문 하이라이트 → 검토 항목 (REV-06) */
   function selectAnchor(anchorId) {
     const finding = findingByAnchor.value[anchorId]
-    if (finding) activeFindingId.value = finding.id
+    if (finding) {
+      panelTab.value = 'findings'
+      activeFindingId.value = finding.id
+    }
   }
 
   function toggleTypeFilter(type) {
@@ -218,6 +224,7 @@ export const useReviewStore = defineStore('review', () => {
     if (!job.value) return null
     const created = await reviewApi.promoteToFinding(job.value.id, draft)
     findings.value.push(created)
+    panelTab.value = 'findings'
     activeFindingId.value = created.id
     return created
   }
@@ -231,13 +238,15 @@ export const useReviewStore = defineStore('review', () => {
     }
   }
 
-  function addAnnotation({ page, anchorId, selectedText, text }) {
+  function addAnnotation({ page, anchorId, selectedText = '', context = '', findingId = null, text }) {
     if (!job.value) return null
     const annotation = {
       id: `annotation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       page,
       anchorId,
       selectedText,
+      context,
+      findingId,
       text,
       createdAt: new Date().toISOString(),
     }
@@ -266,6 +275,7 @@ export const useReviewStore = defineStore('review', () => {
   function selectAnnotation(annotationId) {
     const annotation = annotations.value.find((item) => item.id === annotationId)
     if (!annotation) return
+    panelTab.value = 'annotations'
     activeFindingId.value = null
     goToPage(annotation.page)
     flashAnchorId.value = annotation.anchorId
@@ -288,6 +298,7 @@ export const useReviewStore = defineStore('review', () => {
     findings.value = []
     annotations.value = []
     activeFindingId.value = null
+    panelTab.value = 'findings'
     filterType.value = 'ALL'
     undecidedOnly.value = false
     currentPage.value = 1
@@ -311,6 +322,7 @@ export const useReviewStore = defineStore('review', () => {
     zoom,
     showEvidence,
     activeFindingId,
+    panelTab,
     filterType,
     sort,
     undecidedOnly,

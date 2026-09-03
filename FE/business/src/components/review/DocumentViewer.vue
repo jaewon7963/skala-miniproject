@@ -23,12 +23,31 @@ const toneMap = {
 
 const totalPages = computed(() => pages.value.length || 1)
 const viewerScroll = ref(null)
+const gestureStartZoom = ref(82)
 const selection = ref(null)
 const optionsOpen = ref(false)
 const adding = ref(false)
 const annotationText = ref('')
 
 const typeOptions = [FINDING_TYPE.ERROR, FINDING_TYPE.NEEDS_CHECK, FINDING_TYPE.NO_EVIDENCE]
+
+const clampZoom = (value) => Math.min(140, Math.max(55, Math.round(value)))
+
+function handleTrackpadZoom(event) {
+  if (!event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  zoom.value = clampZoom(zoom.value - event.deltaY * 0.12)
+}
+
+function startTrackpadGesture(event) {
+  event.preventDefault()
+  gestureStartZoom.value = zoom.value
+}
+
+function handleTrackpadGesture(event) {
+  event.preventDefault()
+  zoom.value = clampZoom(gestureStartZoom.value * event.scale)
+}
 
 watch(flashAnchorId, async (anchorId) => {
   if (!anchorId) return
@@ -51,12 +70,19 @@ function selectedEvidenceOf(finding, blockId) {
   return finding?.evidence?.find((item) => item.anchorId === blockId)
 }
 
+function annotationPinsOf(blockId) {
+  return review.annotations
+    .map((annotation, index) => ({ ...annotation, annotationIndex: index + 1 }))
+    .filter((annotation) => annotation.anchorId === blockId && !annotation.selectedText)
+}
+
 function textSegments(block) {
+  const sourceText = String(block.text ?? '')
   const finding = findingOf(block.id)
   const ranges = []
   const findingText = selectedEvidenceOf(finding, block.id)?.selectedText
   if (findingText) {
-    const start = block.text.indexOf(findingText)
+    const start = sourceText.indexOf(findingText)
     if (start >= 0) {
       ranges.push({
         start,
@@ -69,7 +95,7 @@ function textSegments(block) {
 
   review.annotations.forEach((annotation, index) => {
     if (annotation.anchorId !== block.id || !annotation.selectedText) return
-    const start = block.text.indexOf(annotation.selectedText)
+    const start = sourceText.indexOf(annotation.selectedText)
     if (start >= 0) {
       ranges.push({
         start,
@@ -81,18 +107,18 @@ function textSegments(block) {
     }
   })
 
-  if (!ranges.length) return [{ text: block.text, kind: 'plain' }]
+  if (!ranges.length) return [{ text: sourceText, kind: 'plain' }]
   ranges.sort((left, right) => left.start - right.start || left.end - right.end)
 
   const parts = []
   let cursor = 0
   ranges.forEach((range) => {
     if (range.start < cursor) return
-    if (range.start > cursor) parts.push({ text: block.text.slice(cursor, range.start), kind: 'plain' })
-    parts.push({ ...range, text: block.text.slice(range.start, range.end) })
+    if (range.start > cursor) parts.push({ text: sourceText.slice(cursor, range.start), kind: 'plain' })
+    parts.push({ ...range, text: sourceText.slice(range.start, range.end) })
     cursor = range.end
   })
-  if (cursor < block.text.length) parts.push({ text: block.text.slice(cursor), kind: 'plain' })
+  if (cursor < sourceText.length) parts.push({ text: sourceText.slice(cursor), kind: 'plain' })
   return parts
 }
 
@@ -205,7 +231,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
     </header>
 
     <!-- 지면 -->
-    <div ref="viewerScroll" class="viewer__scroll u-scroll">
+    <div
+      ref="viewerScroll"
+      class="viewer__scroll u-scroll"
+      @wheel="handleTrackpadZoom"
+      @gesturestart="startTrackpadGesture"
+      @gesturechange="handleTrackpadGesture"
+    >
       <article
         class="paper"
         :style="{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }"
@@ -215,7 +247,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 
         <template v-for="block in currentPageData?.blocks ?? []" :key="block.id">
           <!-- 제목 -->
-          <h2 v-if="block.kind === 'h2'" class="paper__h2">{{ block.text }}</h2>
+          <h2
+            v-if="block.kind === 'h2'"
+            class="paper__h2 selectable-text"
+            data-selectable-block
+            :data-block-id="block.id"
+            @click="findingOf(block.id) && review.selectAnchor(block.id)"
+          >
+            <template v-for="(part, index) in textSegments(block)" :key="index">
+              <mark
+                v-if="part.kind === 'finding'"
+                class="selection-mark"
+                :class="[`hl--${part.tone}`, { 'is-flash': flashAnchorId === block.id }]"
+              >{{ part.text }}</mark>
+              <mark
+                v-else-if="part.kind === 'annotation'"
+                class="annotation-mark"
+                :class="{ 'is-flash': flashAnchorId === block.id }"
+                @click.stop="review.selectAnnotation(part.annotationId)"
+              >{{ part.text }}<sup>{{ part.annotationIndex }}</sup></mark>
+              <template v-else>{{ part.text }}</template>
+            </template>
+          </h2>
 
           <!-- 문단 -->
           <p
@@ -250,41 +303,149 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
               </mark>
               <template v-else>{{ part.text }}</template>
             </template>
+            <span v-if="annotationPinsOf(block.id).length" class="annotation-pins">
+              <button
+                v-for="annotation in annotationPinsOf(block.id)"
+                :key="annotation.id"
+                type="button"
+                class="annotation-pin"
+                :class="{ 'is-flash': flashAnchorId === block.id }"
+                :aria-label="`주석 ${annotation.annotationIndex} 보기`"
+                @click.stop="review.selectAnnotation(annotation.id)"
+              >{{ annotation.annotationIndex }}</button>
+            </span>
           </p>
 
           <!-- 표 -->
           <figure
             v-else-if="block.kind === 'table'"
             class="paper__table"
+            :data-block-id="block.id"
             :class="[
               toneOf(block.id) ? `hl hl--${toneOf(block.id)}` : '',
               { 'is-flash': flashAnchorId === block.id },
             ]"
             @click="findingOf(block.id) && review.selectAnchor(block.id)"
           >
-            <figcaption>{{ block.caption }}</figcaption>
+            <figcaption
+              class="selectable-text"
+              data-selectable-block
+              :data-block-id="`${block.id}--caption`"
+              @click.stop="findingOf(`${block.id}--caption`) && review.selectAnchor(`${block.id}--caption`)"
+            >
+              <template
+                v-for="(part, index) in textSegments({ id: `${block.id}--caption`, text: block.caption })"
+                :key="index"
+              >
+                <mark
+                  v-if="part.kind === 'finding'"
+                  class="selection-mark"
+                  :class="[`hl--${part.tone}`, { 'is-flash': flashAnchorId === `${block.id}--caption` }]"
+                >{{ part.text }}</mark>
+                <mark
+                  v-else-if="part.kind === 'annotation'"
+                  class="annotation-mark"
+                  :class="{ 'is-flash': flashAnchorId === `${block.id}--caption` }"
+                  @click.stop="review.selectAnnotation(part.annotationId)"
+                >{{ part.text }}<sup>{{ part.annotationIndex }}</sup></mark>
+                <template v-else>{{ part.text }}</template>
+              </template>
+            </figcaption>
             <table>
               <thead>
                 <tr>
-                  <th v-for="head in block.head" :key="head">{{ head }}</th>
+                  <th
+                    v-for="(head, cellIndex) in block.head"
+                    :key="head"
+                    class="selectable-text"
+                    data-selectable-block
+                    :data-block-id="`${block.id}--head-${cellIndex}`"
+                    @click.stop="findingOf(`${block.id}--head-${cellIndex}`) && review.selectAnchor(`${block.id}--head-${cellIndex}`)"
+                  >
+                    <template
+                      v-for="(part, index) in textSegments({ id: `${block.id}--head-${cellIndex}`, text: head })"
+                      :key="index"
+                    >
+                      <mark
+                        v-if="part.kind === 'finding'"
+                        class="selection-mark"
+                        :class="[`hl--${part.tone}`, { 'is-flash': flashAnchorId === `${block.id}--head-${cellIndex}` }]"
+                      >{{ part.text }}</mark>
+                      <mark
+                        v-else-if="part.kind === 'annotation'"
+                        class="annotation-mark"
+                        :class="{ 'is-flash': flashAnchorId === `${block.id}--head-${cellIndex}` }"
+                        @click.stop="review.selectAnnotation(part.annotationId)"
+                      >{{ part.text }}<sup>{{ part.annotationIndex }}</sup></mark>
+                      <template v-else>{{ part.text }}</template>
+                    </template>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(row, rowIndex) in block.rows" :key="rowIndex">
-                  <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+                  <td
+                    v-for="(cell, cellIndex) in row"
+                    :key="cellIndex"
+                    class="selectable-text"
+                    data-selectable-block
+                    :data-block-id="`${block.id}--cell-${rowIndex}-${cellIndex}`"
+                    @click.stop="findingOf(`${block.id}--cell-${rowIndex}-${cellIndex}`) && review.selectAnchor(`${block.id}--cell-${rowIndex}-${cellIndex}`)"
+                  >
+                    <template
+                      v-for="(part, index) in textSegments({ id: `${block.id}--cell-${rowIndex}-${cellIndex}`, text: cell })"
+                      :key="index"
+                    >
+                      <mark
+                        v-if="part.kind === 'finding'"
+                        class="selection-mark"
+                        :class="[`hl--${part.tone}`, { 'is-flash': flashAnchorId === `${block.id}--cell-${rowIndex}-${cellIndex}` }]"
+                      >{{ part.text }}</mark>
+                      <mark
+                        v-else-if="part.kind === 'annotation'"
+                        class="annotation-mark"
+                        :class="{ 'is-flash': flashAnchorId === `${block.id}--cell-${rowIndex}-${cellIndex}` }"
+                        @click.stop="review.selectAnnotation(part.annotationId)"
+                      >{{ part.text }}<sup>{{ part.annotationIndex }}</sup></mark>
+                      <template v-else>{{ part.text }}</template>
+                    </template>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <span v-if="annotationPinsOf(block.id).length" class="annotation-pins">
+              <button
+                v-for="annotation in annotationPinsOf(block.id)"
+                :key="annotation.id"
+                type="button"
+                class="annotation-pin"
+                :class="{ 'is-flash': flashAnchorId === block.id }"
+                :aria-label="`주석 ${annotation.annotationIndex} 보기`"
+                @click.stop="review.selectAnnotation(annotation.id)"
+              >{{ annotation.annotationIndex }}</button>
+            </span>
           </figure>
 
           <!-- 이미지 · 그래프 -->
           <div
             v-else
             class="paper__figure"
+            :data-block-id="block.id"
             :class="toneOf(block.id) ? `hl hl--${toneOf(block.id)}` : ''"
             @click="findingOf(block.id) && review.selectAnchor(block.id)"
           >
             {{ block.text }}
+            <span v-if="annotationPinsOf(block.id).length" class="annotation-pins">
+              <button
+                v-for="annotation in annotationPinsOf(block.id)"
+                :key="annotation.id"
+                type="button"
+                class="annotation-pin"
+                :class="{ 'is-flash': flashAnchorId === block.id }"
+                :aria-label="`주석 ${annotation.annotationIndex} 보기`"
+                @click.stop="review.selectAnnotation(annotation.id)"
+              >{{ annotation.annotationIndex }}</button>
+            </span>
           </div>
         </template>
       </article>
@@ -352,6 +513,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   border-radius: 2px;
   box-shadow: inset 0 -2px 0 currentColor;
 }
+.selectable-text {
+  cursor: text;
+  user-select: text;
+}
 .annotation-mark {
   position: relative;
   cursor: pointer;
@@ -375,6 +540,32 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   font-weight: 700;
   line-height: 1;
   vertical-align: super;
+}
+.annotation-pins {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  display: flex;
+  gap: 3px;
+}
+.annotation-pin {
+  min-width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--c-primary-600);
+  color: var(--c-white);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+.annotation-pin:hover {
+  background: var(--c-primary-700);
+  transform: translateY(-1px);
 }
 .selection-action {
   position: fixed;
@@ -564,6 +755,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   border-radius: var(--r-sm);
 }
 .paper__table {
+  position: relative;
   margin: 16px 0;
   padding: 6px;
   border-radius: var(--r-sm);
@@ -584,6 +776,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   font-weight: 600;
 }
 .paper__figure {
+  position: relative;
   height: 120px;
   display: grid;
   place-items: center;
@@ -617,7 +810,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 }
 .hl.is-flash,
 .selection-mark.is-flash,
-.annotation-mark.is-flash {
+.annotation-mark.is-flash,
+.annotation-pin.is-flash {
   animation: flash 0.85s ease;
 }
 @keyframes flash {
