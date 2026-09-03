@@ -18,9 +18,14 @@ export const mockUser = {
   createdAt: '2026-08-01T09:00:00+09:00',
 }
 
-export const mockFolders = [
-  { id: 'fd-1', name: '2026 창업지원패키지', count: 2 },
-  { id: 'fd-2', name: '시리즈A 실사', count: 1 },
+export const mockTags = [
+  { id: 'ai', name: 'AI' },
+  { id: 'government', name: '정부과제' },
+  { id: 'rnd', name: 'R&D' },
+  { id: 'investment', name: '투자' },
+  { id: 'robotics', name: '로보틱스' },
+  { id: 'healthcare', name: '헬스케어' },
+  { id: 'eco', name: '친환경' },
 ]
 
 export const mockDocuments = [
@@ -31,7 +36,7 @@ export const mockDocuments = [
     pageCount: 21,
     sizeBytes: 4.2 * 1024 * 1024,
     status: DOC_STATUS.REVIEWING,
-    folderId: 'fd-1',
+    tags: ['ai', 'robotics'],
     latestJobId: 'job-1',
     updatedAt: '2026-09-02T14:20:00+09:00',
     summary: '무인매장 안내 로봇 개발 및 사업화 계획',
@@ -43,7 +48,7 @@ export const mockDocuments = [
     pageCount: 34,
     sizeBytes: 8.1 * 1024 * 1024,
     status: DOC_STATUS.FAILED,
-    folderId: 'fd-1',
+    tags: ['government', 'rnd'],
     latestJobId: null,
     updatedAt: '2026-09-01T09:10:00+09:00',
     summary: '스캔 PDF · 텍스트 레이어 없음',
@@ -55,7 +60,7 @@ export const mockDocuments = [
     pageCount: 18,
     sizeBytes: 2.6 * 1024 * 1024,
     status: DOC_STATUS.DONE,
-    folderId: 'fd-2',
+    tags: ['investment', 'eco'],
     latestJobId: 'job-3',
     updatedAt: '2026-08-30T18:44:00+09:00',
     summary: '시리즈A 투자 유치용 IR 자료',
@@ -67,7 +72,7 @@ export const mockDocuments = [
     pageCount: 27,
     sizeBytes: 5.4 * 1024 * 1024,
     status: DOC_STATUS.DONE,
-    folderId: null,
+    tags: ['government', 'rnd', 'healthcare'],
     latestJobId: 'job-4',
     updatedAt: '2026-08-28T11:02:00+09:00',
     summary: '디지털 치료제 임상 실증 과제',

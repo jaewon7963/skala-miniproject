@@ -15,7 +15,7 @@ import {
   buildPages,
   mockDocuments,
   mockFindings,
-  mockFolders,
+  mockTags,
   mockJobSteps,
   mockSections,
   mockUser,
@@ -31,7 +31,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value))
 const state = {
   user: clone(mockUser),
   documents: clone(mockDocuments),
-  folders: clone(mockFolders),
+  tags: clone(mockTags),
   jobs: {},
   findings: {},
   chats: {},
@@ -174,7 +174,7 @@ export const auth = {
 /* documents                                                           */
 /* ------------------------------------------------------------------ */
 export const documents = {
-  async list({ q = '', status = 'ALL', period = 'ALL', sort = 'UPDATED_DESC', folderId = null, page = 1, size = 20 } = {}) {
+  async list({ q = '', status = 'ALL', period = 'ALL', sort = 'UPDATED_DESC', tag = null, page = 1, size = 20 } = {}) {
     await delay()
     let items = clone(state.documents)
 
@@ -183,11 +183,12 @@ export const documents = {
       items = items.filter(
         (d) =>
           d.name.toLowerCase().includes(keyword) ||
-          (d.summary || '').toLowerCase().includes(keyword),
+          (d.summary || '').toLowerCase().includes(keyword) ||
+          (d.tags || []).some((tagId) => tagId.toLowerCase().includes(keyword)),
       )
     }
     if (status !== 'ALL') items = items.filter((d) => d.status === status)
-    if (folderId) items = items.filter((d) => d.folderId === folderId)
+    if (tag) items = items.filter((d) => d.tags?.includes(tag))
     if (period !== 'ALL') {
       const days = { D7: 7, D30: 30, D90: 90 }[period] ?? 3650
       const from = Date.now() - days * 864e5
@@ -222,9 +223,12 @@ export const documents = {
     return clone(findDocument(id))
   },
 
-  async folders() {
+  async tags() {
     await delay(120)
-    return clone(state.folders)
+    return state.tags.map((tag) => ({
+      ...clone(tag),
+      count: state.documents.filter((document) => document.tags?.includes(tag.id)).length,
+    }))
   },
 
   async upload(file, { onProgress } = {}) {
@@ -245,7 +249,7 @@ export const documents = {
       pageCount: 21,
       sizeBytes: file.size,
       status: DOC_STATUS.IDLE,
-      folderId: null,
+      tags: [],
       latestJobId: null,
       updatedAt: new Date().toISOString(),
       summary: '업로드 완료 · 분석 대기',

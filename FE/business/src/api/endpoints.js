@@ -18,7 +18,6 @@ export const EP = {
     upload: '/documents',
     rename: (id) => `/documents/${id}/name`,
     remove: (id) => `/documents/${id}`,
-    folders: '/folders',
   },
   reviews: {
     createJob: '/review-jobs',
