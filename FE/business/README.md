@@ -71,14 +71,32 @@ src/
 | `/review/:jobId/report` | 검토 의견서 · 내보내기 | SHR-03 |
 | `/settings` | 프로필 · 계정 | AUTH-05, AUTH-06 |
 
-## 테마
+## 테마 (라이트 · 다크)
 
-색상은 전부 `src/assets/styles/tokens.css` 의 CSS 변수입니다. 하드코딩된 색상값은 없습니다.
+색상은 전부 `src/assets/styles/tokens.css` 의 CSS 변수입니다. 컴포넌트에 하드코딩된 색상값은 없습니다.
 
 - 배경 `--c-bg` 화이트
 - 메인 `--c-primary-500` `#ff6a00` (버튼 · 활성 상태 · 강조)
 - 서브 `--c-danger-500` `#e5342b` (오류 유형 · 파괴적 동작)
 - 검토 유형: 오류=레드 / 확인 필요=오렌지 / 근거 부족=슬레이트
+
+다크 모드는 `<html data-theme="dark">` 한 줄로 동작합니다. `tokens.css` 의 `:root[data-theme='dark']`
+블록이 같은 변수명을 재정의하므로 **컴포넌트 CSS는 수정할 필요가 없습니다.**
+
+- 상태 관리: `src/composables/useTheme.js` (`initTheme()` 은 `main.js` 에서 mount 전에 호출 → 깜빡임 없음)
+- 저장 키: `logicheck.theme` · 저장값이 없으면 OS 설정(`prefers-color-scheme`)을 따릅니다
+- 토글 위치: 라이브러리 좌측 사이드바 하단 (`ThemeToggle.vue`)
+- 인쇄 시에는 다크 모드여도 라이트 팔레트로 출력됩니다 (검토 의견서용)
+
+새 컴포넌트를 만들 때 지켜야 할 것: `#fff` / `#000` 대신 `--c-surface`, `--c-text`,
+`--c-surface-blur`(반투명 헤더), `--c-inverse-bg` / `--c-inverse-fg`(토스트 · 툴팁) 을 사용하세요.
+
+## 검토 화면 레이아웃
+
+- 좌 · 우 사이드바는 가운데 핸들을 드래그해 너비 조절, **더블클릭 시 기본값으로 초기화**됩니다
+- 범위: 목차 180~420px / 검토 패널 300~620px · 저장 키 `logicheck.review.layout`
+- 상태는 `stores/review.js` 의 `outlineWidth` · `panelWidth` 가 단일 소스입니다
+- `원문 근거 표시` 토글은 상단 바에 있습니다
 
 ## 기획 확정이 필요한 부분 (코드에 TODO 주석으로 표시)
 

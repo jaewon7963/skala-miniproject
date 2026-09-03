@@ -8,9 +8,28 @@ import {
   VERDICT,
 } from '@/constants/enums'
 
+const LAYOUT_KEY = 'logicheck.review.layout'
+const OUTLINE_RANGE = { min: 180, max: 420, default: 248 }
+const PANEL_RANGE = { min: 300, max: 620, default: 400 }
+
+const clamp = (value, { min, max }) => Math.min(max, Math.max(min, Math.round(value)))
+
+function loadLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}')
+    return {
+      outlineWidth: clamp(saved.outlineWidth ?? OUTLINE_RANGE.default, OUTLINE_RANGE),
+      panelWidth: clamp(saved.panelWidth ?? PANEL_RANGE.default, PANEL_RANGE),
+    }
+  } catch {
+    return { outlineWidth: OUTLINE_RANGE.default, panelWidth: PANEL_RANGE.default }
+  }
+}
+
 /**
  * 검토 화면 상태 (REV-01 ~ REV-07)
  * - 원문 ↔ 검토 항목 양방향 앵커의 단일 소스입니다.
+ * - 좌 · 우 사이드바 너비도 여기서 관리하고 localStorage 에 저장합니다.
  */
 export const useReviewStore = defineStore('review', () => {
   const job = ref(null)
@@ -19,6 +38,36 @@ export const useReviewStore = defineStore('review', () => {
   const findings = ref([])
   const loading = ref(false)
   const error = ref('')
+
+  /* 레이아웃 (드래그로 조절, 새로고침 후에도 유지) */
+  const layout = loadLayout()
+  const outlineWidth = ref(layout.outlineWidth)
+  const panelWidth = ref(layout.panelWidth)
+
+  function persistLayout() {
+    try {
+      localStorage.setItem(
+        LAYOUT_KEY,
+        JSON.stringify({ outlineWidth: outlineWidth.value, panelWidth: panelWidth.value }),
+      )
+    } catch {
+      /* 저장 실패는 무시 */
+    }
+  }
+
+  function setOutlineWidth(value) {
+    outlineWidth.value = clamp(value, OUTLINE_RANGE)
+  }
+
+  function setPanelWidth(value) {
+    panelWidth.value = clamp(value, PANEL_RANGE)
+  }
+
+  function resetLayout() {
+    outlineWidth.value = OUTLINE_RANGE.default
+    panelWidth.value = PANEL_RANGE.default
+    persistLayout()
+  }
 
   /* 뷰어 상태 */
   const currentPage = ref(1)
@@ -184,6 +233,12 @@ export const useReviewStore = defineStore('review', () => {
     findings,
     loading,
     error,
+    outlineWidth,
+    panelWidth,
+    setOutlineWidth,
+    setPanelWidth,
+    persistLayout,
+    resetLayout,
     currentPage,
     zoom,
     showEvidence,

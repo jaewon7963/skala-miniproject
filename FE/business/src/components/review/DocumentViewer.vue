@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useReviewStore } from '@/stores/review'
-import { FINDING_TYPE, VERDICT } from '@/constants/enums'
+import { FINDING_TYPE } from '@/constants/enums'
 import FindingTypeBadge from '@/components/common/FindingTypeBadge.vue'
 
 /**
@@ -28,7 +28,6 @@ function findingOf(blockId) {
 function toneOf(blockId) {
   const finding = findingOf(blockId)
   if (!finding) return null
-  if (finding.verdict !== VERDICT.PENDING) return 'decided' // 판정 완료 → 회색
   return toneMap[finding.type]
 }
 </script>
@@ -261,10 +260,6 @@ function toneOf(blockId) {
   background: var(--c-finding-evidence-bg);
   color: var(--c-finding-evidence);
 }
-.hl--decided {
-  background: var(--c-bg-subtle);
-  color: var(--c-text-subtle);
-}
 .hl.is-active {
   outline: 2px solid currentColor;
   outline-offset: 1px;
@@ -294,8 +289,8 @@ function toneOf(blockId) {
   gap: 6px;
   padding: 7px 9px;
   border-radius: var(--r-md);
-  background: var(--c-text);
-  color: #fff;
+  background: var(--c-inverse-bg);
+  color: var(--c-inverse-fg);
   font-size: var(--fs-sm);
   line-height: 1.4;
   box-shadow: var(--shadow-md);

@@ -55,7 +55,7 @@ async function logout() {
   z-index: 30;
   height: var(--header-h);
   border-bottom: 1px solid var(--c-border);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--c-surface-blur);
   backdrop-filter: blur(6px);
 }
 .header__inner {
