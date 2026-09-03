@@ -35,16 +35,23 @@
   --c-text-subtle: #a8a29e;
   --c-slate-500: #64748b;
   --c-slate-50: #f5f7f9;
+  --c-info-500: #2878b8;
+  --c-info-50: #eaf6ff;
   --c-success-500: #15803d;
   --c-success-50: #eefaf2;
+
+  /* --- 반투명 표면(헤더 블러) · 반전 표면(토스트 · 툴팁) --- */
+  --c-surface-blur: rgba(255, 255, 255, 0.88);
+  --c-inverse-bg: #1c1917;
+  --c-inverse-fg: #ffffff;
 
   /* --- Semantic : 검토 결과 유형 --- */
   --c-finding-error: var(--c-danger-500);
   --c-finding-error-bg: var(--c-danger-50);
   --c-finding-check: var(--c-primary-600);
   --c-finding-check-bg: var(--c-primary-50);
-  --c-finding-evidence: var(--c-slate-500);
-  --c-finding-evidence-bg: var(--c-slate-50);
+  --c-finding-evidence: var(--c-info-500);
+  --c-finding-evidence-bg: var(--c-info-50);
 
   /* --- Radius --- */
   --r-sm: 6px;
@@ -77,4 +84,58 @@
   --content-max: 1280px;
 
   --transition: 140ms ease;
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   Dark theme — <html data-theme="dark">
+   토큰 값만 재정의합니다. 컴포넌트 CSS는 수정할 필요가 없습니다.
+   ============================================================ */
+:root[data-theme='dark'] {
+  /* Brand : Orange — 어두운 배경에서 밝게 조정 */
+  --c-primary-50: rgba(255, 122, 31, 0.13);
+  --c-primary-100: rgba(255, 122, 31, 0.22);
+  --c-primary-200: rgba(255, 122, 31, 0.34);
+  --c-primary-300: rgba(255, 122, 31, 0.5);
+  --c-primary-400: #ff8f42;
+  --c-primary-500: #ff7a1f;
+  --c-primary-600: #ff9247;
+  --c-primary-700: #ffb27a;
+
+  /* Brand : Red */
+  --c-danger-50: rgba(255, 92, 82, 0.14);
+  --c-danger-100: rgba(255, 92, 82, 0.24);
+  --c-danger-200: rgba(255, 92, 82, 0.4);
+  --c-danger-500: #ff5c52;
+  --c-danger-600: #ff7a70;
+  --c-danger-700: #ff9d95;
+
+  /* Neutral */
+  --c-bg: #121110;
+  --c-bg-subtle: #1a1917;
+  --c-surface: #1c1b19;
+  --c-surface-hover: #262421;
+  --c-border: #322f2c;
+  --c-border-strong: #47423d;
+  --c-text: #f2efec;
+  --c-text-muted: #a8a29c;
+  --c-text-subtle: #7c766f;
+  --c-slate-500: #9aa5b4;
+  --c-slate-50: rgba(148, 163, 184, 0.14);
+  --c-info-500: #7cc4f8;
+  --c-info-50: rgba(80, 174, 235, 0.16);
+  --c-success-500: #4ade80;
+  --c-success-50: rgba(74, 222, 128, 0.14);
+
+  --c-surface-blur: rgba(18, 17, 16, 0.88);
+  --c-inverse-bg: #3a3633;
+  --c-inverse-fg: #f7f5f3;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --ring: 0 0 0 3px rgba(255, 122, 31, 0.28);
+
+  color-scheme: dark;
 }

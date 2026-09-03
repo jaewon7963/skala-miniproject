@@ -33,8 +33,8 @@ const { toasts } = storeToRefs(ui)
   max-width: 380px;
   padding: 11px 14px;
   border-radius: var(--r-md);
-  background: var(--c-text);
-  color: #fff;
+  background: var(--c-inverse-bg);
+  color: var(--c-inverse-fg);
   font-size: var(--fs-md);
   box-shadow: var(--shadow-md);
 }

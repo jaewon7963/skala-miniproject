@@ -13,6 +13,7 @@ import AppPagination from '@/components/common/AppPagination.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 /** DASH-01 ~ DASH-04 (F-09, F-10, F-12) */
 const router = useRouter()
@@ -106,6 +107,8 @@ async function submitDelete() {
         </li>
       </ul>
 
+      <hr class="side__divider" />
+
       <p class="side__label">폴더</p>
       <ul class="side__list">
         <li v-for="folder in folders" :key="folder.id">
@@ -119,6 +122,11 @@ async function submitDelete() {
         </li>
         <li v-if="!folders.length" class="side__empty">폴더가 없습니다</li>
       </ul>
+
+      <!-- 사이드바 하단 : 다크 모드 전환 -->
+      <footer class="side__foot">
+        <ThemeToggle />
+      </footer>
     </aside>
 
     <!-- 우측 : 목록 -->
@@ -173,9 +181,7 @@ async function submitDelete() {
           <tbody v-if="items.length">
             <tr v-for="doc in items" :key="doc.id" @click="openDocument(doc)">
               <td>
-                <p class="doc__name">
-                  {{ doc.name }} <span class="doc__version">v{{ doc.version }}</span>
-                </p>
+                <p class="doc__name">{{ doc.name }}</p>
                 <p class="doc__meta">
                   {{ doc.pageCount }}페이지 · {{ formatBytes(doc.sizeBytes) }}
                 </p>
@@ -269,6 +275,26 @@ async function submitDelete() {
 }
 
 /* --- 사이드바 --- */
+.side {
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--header-h) - 72px);
+  padding-right: 16px;
+  border-right: 1px solid var(--c-border);
+}
+.side__divider {
+  height: 1px;
+  margin: 4px 8px 14px;
+  border: none;
+  background: var(--c-border);
+}
+.side__foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-border);
+}
 .side__label {
   font-size: var(--fs-sm);
   font-weight: 700;
@@ -277,7 +303,7 @@ async function submitDelete() {
   margin: 6px 0;
 }
 .side__list {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .side__list button {
   width: 100%;
@@ -371,11 +397,6 @@ async function submitDelete() {
 }
 .doc__name {
   font-weight: 600;
-}
-.doc__version {
-  font-size: var(--fs-sm);
-  color: var(--c-primary-600);
-  font-weight: 700;
 }
 .doc__meta {
   font-size: var(--fs-sm);

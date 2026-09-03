@@ -20,6 +20,9 @@ body {
   margin: 0;
   background: var(--c-bg);
   color: var(--c-text);
+  transition:
+    background-color var(--transition),
+    color var(--transition);
   font-family: var(--font-sans);
   font-size: var(--fs-base);
   line-height: 1.55;
@@ -55,6 +58,11 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--c-primary-500);
 }
 
 button {
@@ -127,6 +135,13 @@ table {
   margin-top: 6px;
 }
 
+/* ---------- 사이드바 리사이즈 중 ---------- */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
 /* ---------- 화면 전환 ---------- */
 .fade-enter-active,
 .fade-leave-active {
@@ -139,6 +154,23 @@ table {
 
 /* ---------- 인쇄(검토 의견서) ---------- */
 @media print {
+  /* 다크 모드로 보고 있어도 인쇄물은 라이트 팔레트로 출력합니다 */
+  :root[data-theme='dark'] {
+    --c-bg: #ffffff;
+    --c-bg-subtle: #ffffff;
+    --c-surface: #ffffff;
+    --c-border: #dddddd;
+    --c-border-strong: #bbbbbb;
+    --c-text: #111111;
+    --c-text-muted: #444444;
+    --c-text-subtle: #666666;
+    --c-primary-50: #fff5ed;
+    --c-primary-500: #ff6a00;
+    --c-primary-600: #e85e00;
+    --c-primary-700: #bd4c00;
+    color-scheme: light;
+  }
+
   .no-print {
     display: none !important;
   }

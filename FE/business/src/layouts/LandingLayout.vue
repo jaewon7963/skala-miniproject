@@ -91,7 +91,7 @@ const navLinks = [
     border-color var(--transition);
 }
 .nav.is-scrolled {
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--c-surface-blur);
   backdrop-filter: blur(10px);
   border-bottom-color: var(--c-border);
 }

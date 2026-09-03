@@ -2,10 +2,11 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useReviewStore } from '@/stores/review'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 
 /** REV-02 목차 네비게이션 */
 const review = useReviewStore()
-const { sections, currentPage, showEvidence } = storeToRefs(review)
+const { sections, currentPage, outlineWidth } = storeToRefs(review)
 
 /** 현재 페이지가 속한 섹션 1개만 활성 표시 */
 const activeSectionId = computed(
@@ -14,7 +15,7 @@ const activeSectionId = computed(
 </script>
 
 <template>
-  <aside class="outline">
+  <aside class="outline" :style="{ width: `${outlineWidth}px` }">
     <header class="outline__head">문서 목차</header>
 
     <ol class="outline__list u-scroll">
@@ -32,21 +33,16 @@ const activeSectionId = computed(
     </ol>
 
     <footer class="outline__foot">
-      <label class="toggle">
-        <input v-model="showEvidence" type="checkbox" />
-        원문 근거 표시
-      </label>
+      <ThemeToggle />
     </footer>
   </aside>
 </template>
 
 <style scoped>
 .outline {
-  width: var(--outline-w);
   flex: none;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--c-border);
   background: var(--c-bg-subtle);
 }
 .outline__head {
@@ -62,6 +58,11 @@ const activeSectionId = computed(
 .outline__list {
   flex: 1;
   padding: 8px;
+}
+.outline__foot {
+  flex: none;
+  padding: 10px 8px;
+  border-top: 1px solid var(--c-border);
 }
 .outline__list button {
   width: 100%;
@@ -109,17 +110,4 @@ const activeSectionId = computed(
 .outline__page {
   font-size: var(--fs-xs);
   color: var(--c-text-subtle);
-}
-.outline__foot {
-  border-top: 1px solid var(--c-border);
-  padding: 10px 14px;
-}
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--c-text-muted);
-  cursor: pointer;
-}
-</style>
+}</style>
