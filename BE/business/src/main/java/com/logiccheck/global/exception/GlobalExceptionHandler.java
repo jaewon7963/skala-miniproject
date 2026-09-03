@@ -11,6 +11,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.logiccheck.global.common.ErrorResponse;
@@ -46,6 +47,14 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleInvalidRequest(Exception exception) {
         return badRequest(null);
+    }
+
+    // 컨테이너 레벨 업로드 용량 제한(spring.servlet.multipart.max-file-size)에 걸린 경우의
+    // 안전망. 문서 업로드는 그 전에 앱 코드가 50MB 기준으로 먼저 413을 던진다.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(ErrorCode.FILE_TOO_LARGE.getStatus())
+                .body(ErrorResponse.from(ErrorCode.FILE_TOO_LARGE, null));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
