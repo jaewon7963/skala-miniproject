@@ -6,9 +6,9 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.logiccheck.ai.ReviewAiResult;
 import com.logiccheck.ai.ReviewAiResult.AiEvidence;
 import com.logiccheck.ai.ReviewAiResult.AiFinding;
-import com.logiccheck.review.finding.Calculation;
 import com.logiccheck.review.finding.Finding;
 import com.logiccheck.review.finding.FindingMethod;
 import com.logiccheck.review.finding.FindingRepository;
@@ -37,7 +37,7 @@ public class ReviewJobStateWriter {
     }
 
     @Transactional
-    public void advance(Long jobId, List<JobStep> steps) {
+    public void advance(Long jobId, List<String> steps) {
         reviewJobRepository.findById(jobId).ifPresent(job -> job.advance(steps));
     }
 
@@ -68,7 +68,9 @@ public class ReviewJobStateWriter {
                 source.title(),
                 source.description(),
                 BigDecimal.valueOf(source.confidence()),
-                toCalculation(source),
+                expression(source),
+                number(source, ReviewAiResult.AiCalculation::expected),
+                number(source, ReviewAiResult.AiCalculation::actual),
                 orderNo);
         for (AiEvidence evidence : source.evidence()) {
             finding.addEvidence(evidence.anchorId(), evidence.page(), evidence.label(), null);
@@ -76,11 +78,16 @@ public class ReviewJobStateWriter {
         findingRepository.save(finding);
     }
 
-    private Calculation toCalculation(AiFinding source) {
+    private String expression(AiFinding source) {
+        return source.calculation() == null ? null : source.calculation().expression();
+    }
+
+    private BigDecimal number(AiFinding source,
+                               java.util.function.Function<ReviewAiResult.AiCalculation, Double> field) {
         if (source.calculation() == null) {
             return null;
         }
-        return new Calculation(source.calculation().expression(), source.calculation().expected(),
-                source.calculation().actual(), source.calculation().diff());
+        Double value = field.apply(source.calculation());
+        return value == null ? null : BigDecimal.valueOf(value);
     }
 }

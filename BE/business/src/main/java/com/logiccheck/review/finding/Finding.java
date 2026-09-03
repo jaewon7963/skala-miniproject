@@ -5,9 +5,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -68,9 +65,15 @@ public class Finding {
     @Column(nullable = false)
     private BigDecimal confidence;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "calculation")
-    private Calculation calculation;
+    // 검산 근거. 숫자로 저장하고 사람이 읽는 표기는 응답을 만들 때 붙인다.
+    @Column(name = "calc_expression")
+    private String calcExpression;
+
+    @Column(name = "calc_expected")
+    private BigDecimal calcExpected;
+
+    @Column(name = "calc_actual")
+    private BigDecimal calcActual;
 
     @Column(name = "order_no", nullable = false)
     private int orderNo;
@@ -89,7 +92,8 @@ public class Finding {
     }
 
     private Finding(Long jobId, FindingType findingType, FindingMethod method, Long sectionId, int pageNo,
-                     String title, String description, BigDecimal confidence, Calculation calculation, int orderNo) {
+                     String title, String description, BigDecimal confidence, String calcExpression,
+                     BigDecimal calcExpected, BigDecimal calcActual, int orderNo) {
         this.jobId = jobId;
         this.findingType = findingType;
         this.method = method;
@@ -99,15 +103,17 @@ public class Finding {
         this.title = title;
         this.description = description;
         this.confidence = confidence;
-        this.calculation = calculation;
+        this.calcExpression = calcExpression;
+        this.calcExpected = calcExpected;
+        this.calcActual = calcActual;
         this.orderNo = orderNo;
     }
 
     public static Finding of(Long jobId, FindingType findingType, FindingMethod method, Long sectionId, int pageNo,
-                              String title, String description, BigDecimal confidence, Calculation calculation,
-                              int orderNo) {
-        return new Finding(jobId, findingType, method, sectionId, pageNo, title, description, confidence, calculation,
-                orderNo);
+                              String title, String description, BigDecimal confidence, String calcExpression,
+                              BigDecimal calcExpected, BigDecimal calcActual, int orderNo) {
+        return new Finding(jobId, findingType, method, sectionId, pageNo, title, description, confidence,
+                calcExpression, calcExpected, calcActual, orderNo);
     }
 
     @PrePersist
@@ -160,8 +166,9 @@ public class Finding {
         return confidence;
     }
 
+    /** 저장된 숫자에서 응답용 표현을 만든다. 근거가 없으면 null 이다. */
     public Calculation getCalculation() {
-        return calculation;
+        return Calculation.of(calcExpression, calcExpected, calcActual);
     }
 
     public int getOrderNo() {

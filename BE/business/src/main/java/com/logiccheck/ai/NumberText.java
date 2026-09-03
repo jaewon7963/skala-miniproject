@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * <p>"3.2억", "2억 3,200만", "1,250", "18%" 처럼 단위와 자릿점이 섞인 표기를 다룬다.
  * 한 칸에 단위가 여러 번 나오면(2억 3,200만) 모두 더한다.
  */
-final class NumberText {
+public final class NumberText {
 
     private static final Pattern UNIT_NUMBER = Pattern.compile("(-?[\\d,]+(?:\\.\\d+)?)\\s*(조|억|만|천)?");
     private static final Pattern COUNT_WITH_NOUN = Pattern.compile("([\\d,]+)\\s*개\\s*([가-힣]{2,6})");
@@ -78,8 +78,8 @@ final class NumberText {
         return stripped.length() >= 2 ? stripped : noun;
     }
 
-    /** 사람이 읽는 표기로 되돌린다. 검토 항목 설명에 그대로 들어간다. */
-    static String format(double value) {
+    /** 사람이 읽는 표기로 되돌린다. 검토 항목 설명과 응답의 검산 근거에 그대로 들어간다. */
+    public static String format(double value) {
         double abs = Math.abs(value);
         if (abs >= 100_000_000d) {
             return trim(value / 100_000_000d) + "억";

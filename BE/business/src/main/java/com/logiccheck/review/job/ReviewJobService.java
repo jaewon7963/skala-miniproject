@@ -148,8 +148,9 @@ public class ReviewJobService {
                 ? MANUAL_CONFIDENCE
                 : BigDecimal.valueOf(request.confidence());
 
+        // 사람이 직접 올린 항목에는 검산 근거가 없다.
         Finding finding = Finding.of(jobId, request.findingType(), request.findingMethod(), request.sectionIdAsLong(),
-                page, request.title(), request.description(), confidence, null,
+                page, request.title(), request.description(), confidence, null, null, null,
                 findingRepository.countByJobId(jobId));
         for (FindingDraftRequest.Evidence evidence : request.evidence()) {
             finding.addEvidence(evidence.anchorId(), evidence.page() == null ? page : evidence.page(),

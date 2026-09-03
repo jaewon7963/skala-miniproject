@@ -30,8 +30,9 @@ class StubReviewAiClientTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(mismatch.type()).isEqualTo("ERROR");
-        assertThat(mismatch.calculation().actual()).isEqualTo("30억");
-        assertThat(mismatch.calculation().expected()).isEqualTo("20.7억");
+        // 표시용 문자열이 아니라 숫자로 넘긴다 — 저장하는 쪽이 숫자 컬럼이다.
+        assertThat(mismatch.calculation().actual()).isEqualTo(30_0000_0000d);
+        assertThat(mismatch.calculation().expected()).isEqualTo(20_7000_0000d);
         assertThat(mismatch.evidence()).extracting(AiEvidence::anchorId).containsExactly("b-11-3");
     }
 

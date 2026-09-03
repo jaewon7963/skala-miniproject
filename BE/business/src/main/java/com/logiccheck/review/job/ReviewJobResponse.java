@@ -36,7 +36,7 @@ public record ReviewJobResponse(
                 job.getStatus().name(),
                 job.parseProgress(),
                 job.analyzeProgress(),
-                job.getSteps(),
+                ReviewJobSteps.describe(job.getStepStates()),
                 job.getPartialFailures(),
                 discovered,
                 summary,

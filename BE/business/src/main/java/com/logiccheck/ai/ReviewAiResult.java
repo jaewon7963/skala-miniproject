@@ -26,6 +26,7 @@ public record ReviewAiResult(String modelVersion, String promptVersion, List<AiF
     public record AiEvidence(String anchorId, int page, String label) {
     }
 
-    public record AiCalculation(String expression, String expected, String actual, String diff) {
+    /** 검산 근거. 표시용 문자열이 아니라 숫자로 넘긴다 — 저장하는 쪽이 숫자 컬럼이다. */
+    public record AiCalculation(String expression, Double expected, Double actual) {
     }
 }

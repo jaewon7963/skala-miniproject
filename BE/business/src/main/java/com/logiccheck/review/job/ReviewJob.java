@@ -56,9 +56,10 @@ public class ReviewJob {
     @Column(name = "analyze_started_at")
     private Instant analyzeStartedAt;
 
+    // 단계별 상태만 저장한다. 이름과 문구는 모든 작업이 같아서 ReviewJobSteps 가 갖고 있다.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "steps")
-    private List<JobStep> steps;
+    private List<String> steps;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "partial_failures")
@@ -79,7 +80,7 @@ public class ReviewJob {
     protected ReviewJob() {
     }
 
-    private ReviewJob(Long documentId, int parseDurationMs, int analyzeDurationMs, List<JobStep> steps) {
+    private ReviewJob(Long documentId, int parseDurationMs, int analyzeDurationMs, List<String> steps) {
         this.documentId = documentId;
         this.parseDurationMs = parseDurationMs;
         this.analyzeDurationMs = analyzeDurationMs;
@@ -90,7 +91,7 @@ public class ReviewJob {
         this.phase = JobPhase.PARSE;
     }
 
-    public static ReviewJob start(Long documentId, int parseDurationMs, int analyzeDurationMs, List<JobStep> steps) {
+    public static ReviewJob start(Long documentId, int parseDurationMs, int analyzeDurationMs, List<String> steps) {
         return new ReviewJob(documentId, parseDurationMs, analyzeDurationMs, steps);
     }
 
@@ -99,17 +100,17 @@ public class ReviewJob {
         startedAt = Instant.now();
     }
 
-    public void beginParsing(List<JobStep> steps) {
+    public void beginParsing(List<String> steps) {
         this.status = JobStatus.RUNNING;
         this.phase = JobPhase.PARSE;
         this.steps = steps;
     }
 
-    public void advance(List<JobStep> steps) {
+    public void advance(List<String> steps) {
         this.steps = steps;
     }
 
-    public void beginAnalyzing(List<JobStep> steps, List<PartialFailure> partialFailures) {
+    public void beginAnalyzing(List<String> steps, List<PartialFailure> partialFailures) {
         this.phase = JobPhase.ANALYZE;
         this.steps = steps;
         this.partialFailures = partialFailures;
@@ -188,7 +189,7 @@ public class ReviewJob {
         return phase;
     }
 
-    public List<JobStep> getSteps() {
+    public List<String> getStepStates() {
         return steps == null ? List.of() : steps;
     }
 

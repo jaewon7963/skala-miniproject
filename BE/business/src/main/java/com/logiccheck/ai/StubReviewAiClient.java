@@ -145,8 +145,7 @@ public class StubReviewAiClient implements ReviewAiClient {
                 "표에 적힌 합계는 " + NumberText.format(stated) + "인데 각 항목을 더하면 "
                         + NumberText.format(computed) + "입니다 · 차이 " + NumberText.format(Math.abs(stated - computed)),
                 confidence(0.95, table.id()),
-                new AiCalculation(expression, NumberText.format(computed), NumberText.format(stated),
-                        NumberText.format(Math.abs(stated - computed))),
+                new AiCalculation(expression, computed, stated),
                 List.of(new AiEvidence(table.id(), page.pageNo(), caption + " 합계 행")));
     }
 
