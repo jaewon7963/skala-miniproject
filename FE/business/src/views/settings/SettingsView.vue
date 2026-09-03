@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { validateName, validatePassword } from '@/utils/validators'
+import { validatePassword } from '@/utils/validators'
 import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import AppModal from '@/components/common/AppModal.vue'
@@ -13,30 +13,12 @@ const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 
-const profile = ref({ name: auth.user?.name ?? '' })
-const profileError = ref('')
-const savingProfile = ref(false)
-
 const password = ref({ currentPassword: '', newPassword: '' })
 const passwordErrors = ref({ currentPassword: '', newPassword: '' })
 const savingPassword = ref(false)
 
 const withdrawOpen = ref(false)
 const withdrawPassword = ref('')
-
-async function saveProfile() {
-  profileError.value = validateName(profile.value.name)
-  if (profileError.value) return
-  savingProfile.value = true
-  try {
-    await auth.updateProfile({ name: profile.value.name.trim() })
-    ui.success('변경 사항을 저장했습니다')
-  } catch (e) {
-    ui.error(e.message)
-  } finally {
-    savingProfile.value = false
-  }
-}
 
 async function changePassword() {
   passwordErrors.value.currentPassword = password.value.currentPassword
@@ -80,9 +62,8 @@ async function withdraw() {
     <h1 class="settings__title">설정</h1>
 
     <section class="card u-card">
-      <h2 class="card__title">프로필</h2>
+      <h2 class="card__title">계정 정보</h2>
       <div class="card__body">
-        <AppInput v-model="profile.name" label="이름" :error="profileError" />
         <AppInput
           :model-value="auth.user?.email"
           label="이메일"
@@ -90,9 +71,6 @@ async function withdraw() {
           hint="이메일은 변경할 수 없습니다 (조직 식별 기준)"
         />
       </div>
-      <footer class="card__foot">
-        <AppButton :loading="savingProfile" @click="saveProfile">변경 사항 저장</AppButton>
-      </footer>
     </section>
 
     <section class="card u-card">

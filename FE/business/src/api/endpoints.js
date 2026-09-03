@@ -8,7 +8,6 @@ export const EP = {
     login: '/auth/login',
     logout: '/auth/logout',
     me: '/auth/me',
-    profile: '/auth/me',
     password: '/auth/me/password',
     withdraw: '/auth/me',
   },

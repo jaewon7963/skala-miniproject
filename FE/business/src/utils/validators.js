@@ -15,9 +15,3 @@ export function validatePassword(value) {
   if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value)) return '영문과 숫자를 각 1자 이상 포함해주세요'
   return ''
 }
-
-export function validateName(value) {
-  if (!value?.trim()) return '이름을 입력해주세요'
-  if (value.trim().length < 2) return '2자 이상 입력해주세요'
-  return ''
-}

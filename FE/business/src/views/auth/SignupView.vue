@@ -5,19 +5,18 @@ import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
-import { validateEmail, validateName, validatePassword } from '@/utils/validators'
+import { validateEmail, validatePassword } from '@/utils/validators'
 
 /** AUTH-02 회원가입 (F-06) */
 const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 
-const form = ref({ name: '', email: '', password: '', agreeTerms: false, agreePrivacy: false })
-const errors = ref({ name: '', email: '', password: '', agree: '' })
+const form = ref({ email: '', password: '', agreeTerms: false, agreePrivacy: false })
+const errors = ref({ email: '', password: '', agree: '' })
 const formError = ref('')
 
 async function submit() {
-  errors.value.name = validateName(form.value.name)
   errors.value.email = validateEmail(form.value.email)
   errors.value.password = validatePassword(form.value.password)
   errors.value.agree =
@@ -45,7 +44,6 @@ async function submit() {
     <p v-if="formError" class="alert">{{ formError }}</p>
 
     <form class="form" @submit.prevent="submit">
-      <AppInput v-model="form.name" label="이름" placeholder="김평가" :error="errors.name" />
       <AppInput
         v-model="form.email"
         label="업무용 이메일"
