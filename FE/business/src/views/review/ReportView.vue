@@ -219,6 +219,18 @@ function printPage() {
   font-size: var(--fs-sm);
 }
 
+@media (max-width: 900px) {
+  .report {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings {
+    position: static;
+  }
+  .paper {
+    padding: 28px;
+  }
+}
+
 @media print {
   .report {
     display: block;

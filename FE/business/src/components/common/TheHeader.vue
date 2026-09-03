@@ -53,6 +53,7 @@ async function logout() {
 }
 .header__inner {
   height: 100%;
+  flex-wrap: nowrap;
   max-width: var(--content-max);
   margin: 0 auto;
   padding: 0 24px;
@@ -61,6 +62,7 @@ async function logout() {
   gap: 12px;
 }
 .header__back {
+  white-space: nowrap;
   font-size: var(--fs-md);
   color: var(--c-text-muted);
   padding-right: 4px;

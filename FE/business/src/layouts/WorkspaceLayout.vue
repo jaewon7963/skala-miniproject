@@ -9,6 +9,7 @@
 <style scoped>
 .workspace {
   height: 100vh;
+  min-width: var(--app-min-w);
   display: flex;
   flex-direction: column;
   overflow: hidden;

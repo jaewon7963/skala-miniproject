@@ -12,6 +12,7 @@ import TheHeader from '@/components/common/TheHeader.vue'
 <style scoped>
 .app {
   min-height: 100%;
+  min-width: var(--app-min-w);
   display: flex;
   flex-direction: column;
   background: var(--c-bg);
