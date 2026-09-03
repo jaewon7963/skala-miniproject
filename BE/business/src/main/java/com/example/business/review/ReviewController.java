@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -18,6 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
 
+// 초기 프로토타입 목업. GET /api/findings/{id} 가 명세 22번과 경로가 겹쳐
+// 기본 프로파일에서는 등록하지 않는다. 목업을 쓰려면 --spring.profiles.active=mock.
+@Profile("mock")
 @RestController
 @RequestMapping("/api")
 public class ReviewController {
