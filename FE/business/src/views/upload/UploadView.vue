@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { documentApi, reviewApi } from '@/api'
+import { applyNames } from '@/utils/documentNames'
 import { useUiStore } from '@/stores/ui'
 import { DOC_STATUS, UPLOAD_LIMIT } from '@/constants/enums'
 import { formatBytes } from '@/utils/format'
@@ -29,7 +30,7 @@ const acceptLabel = computed(
 
 onMounted(async () => {
   const { items } = await documentApi.list({ size: 5 })
-  recent.value = items
+  recent.value = applyNames(items)
   // 라이브러리에서 '미분석 문서 열기'로 들어온 경우
   if (route.query.documentId) {
     uploaded.value = items.find((d) => d.id === route.query.documentId) ?? null

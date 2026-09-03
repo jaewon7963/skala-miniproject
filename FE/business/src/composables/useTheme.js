@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
  * - <html data-theme="..."> 속성만 바꾸면 tokens.css 가 색을 교체합니다.
  * - 선택값은 localStorage 에 저장하고, 저장값이 없으면 OS 설정을 따릅니다.
  */
-const STORAGE_KEY = 'logicheck.theme'
+const STORAGE_KEY = 'bizxray.theme'
 const THEMES = { LIGHT: 'light', DARK: 'dark' }
 
 const theme = ref(THEMES.LIGHT)

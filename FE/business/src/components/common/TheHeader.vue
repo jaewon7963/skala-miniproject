@@ -32,14 +32,6 @@ async function logout() {
 
       <span class="u-spacer" />
 
-      <AppButton
-        v-if="route.name !== 'upload'"
-        size="sm"
-        variant="secondary"
-        @click="router.push({ name: 'upload' })"
-      >
-        문서 업로드
-      </AppButton>
       <button class="header__avatar" title="설정" @click="router.push({ name: 'settings' })">
         {{ initial }}
       </button>

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { authApi, tokenStore } from '@/api'
 
-const USER_KEY = 'logicheck.user'
+const USER_KEY = 'bizxray.user'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem(USER_KEY) || 'null'))

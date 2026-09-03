@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { documentApi } from '@/api'
 import { DOC_PERIOD, DOC_SORT } from '@/constants/enums'
+import { applyNames, clearName, setName } from '@/utils/documentNames'
 
 /** 라이브러리 목록 상태 (DASH-01 ~ DASH-04) */
 export const useDocumentStore = defineStore('documents', () => {
@@ -28,7 +29,7 @@ export const useDocumentStore = defineStore('documents', () => {
     error.value = ''
     try {
       const data = await documentApi.list({ ...query.value })
-      items.value = data.items
+      items.value = applyNames(data.items)
       total.value = data.total
       counts.value = data.counts ?? {}
     } catch (e) {
@@ -60,13 +61,21 @@ export const useDocumentStore = defineStore('documents', () => {
     }
   }
 
-  const rename = async (id, name) => {
-    await documentApi.rename(id, name)
-    await fetchList()
+  /**
+   * 문서명 변경 — 프론트에만 반영합니다.
+   * BE rename API가 준비되면 setName 대신 documentApi.rename(id, name) 을 호출하세요.
+   */
+  const rename = (id, name) => {
+    const next = name.trim()
+    if (!next) return
+    setName(id, next)
+    const target = items.value.find((doc) => doc.id === id)
+    if (target) target.name = next
   }
 
   const remove = async (id) => {
     await documentApi.remove(id)
+    clearName(id)
     await fetchList()
   }
 
