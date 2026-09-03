@@ -58,7 +58,7 @@ public class ReviewJobService {
             throw new BusinessException(ErrorCode.JOB_ALREADY_RUNNING);
         }
 
-        triggerPipelineAfterCommit(job.getId());
+        triggerPipelineAfterCommit(job.getId(), userId);
         return job;
     }
 
@@ -66,15 +66,15 @@ public class ReviewJobService {
      * 파이프라인은 커밋 이후에 시작해야 한다. 트랜잭션 안에서 던지면
      * 다른 스레드가 아직 보이지 않는 Job 을 조회해 건너뛴다.
      */
-    private void triggerPipelineAfterCommit(Long jobId) {
+    private void triggerPipelineAfterCommit(Long jobId, Long ownerId) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            reviewPipeline.runAsync(jobId);
+            reviewPipeline.runAsync(jobId, ownerId);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                reviewPipeline.runAsync(jobId);
+                reviewPipeline.runAsync(jobId, ownerId);
             }
         });
     }

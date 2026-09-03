@@ -51,20 +51,30 @@ class ReviewPipelineTest {
                 element(901L, 9, "2027년 예상 매출 18억 원", "18"),
                 element(902L, 11, "2027년 예상 매출 24억 원", "24")));
 
-        pipeline = new ReviewPipeline(store, structurePort, rulesetVersionResolver,
-                new QuoteVerifier(), List.of(new NumericConsistencyChecker()));
+        com.logiccheck.document.port.DocumentQueryPort queryPort = (documentId, userId) ->
+                Optional.of(new com.logiccheck.document.port.DocumentQueryPort.DocumentMetaView(
+                        documentId, userId, "스텁 문서", 21, "DONE"));
+        com.logiccheck.ai.ReviewAiProperties aiOff = new com.logiccheck.ai.ReviewAiProperties(
+                false, null, null, null, null, null, null, null, null);
+        AiReviewStage aiStage = new AiReviewStage(aiOff,
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(com.logiccheck.ai.ReviewAiClient.class),
+                new com.logiccheck.ai.ReviewAiResponseValidator());
+
+        pipeline = new ReviewPipeline(store, structurePort, queryPort, rulesetVersionResolver,
+                new QuoteVerifier(), aiStage, List.of(new NumericConsistencyChecker()));
     }
 
     @Test
     void 착수_시_ruleset_버전을_스냅샷한다() {
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         verify(store).startRunning(42L, RULESET);
     }
 
     @Test
     void 결정적_검산_결과를_저장하고_DONE_으로_끝낸다() {
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<List<FindingDraft>> captor =
@@ -82,7 +92,7 @@ class ReviewPipelineTest {
                 new PageView(9, 595.0, 842.0, "전혀 다른 본문"),
                 new PageView(11, 595.0, 842.0, "전혀 다른 본문")));
 
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<List<FindingDraft>> captor =
@@ -96,7 +106,7 @@ class ReviewPipelineTest {
     void PENDING_이_아닌_Job_은_건너뛴다() {
         when(store.startRunning(42L, RULESET)).thenReturn(Optional.empty());
 
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         verify(store, never()).saveFindings(anyLong(), any());
         verify(store, never()).markDone(anyLong());
@@ -107,7 +117,7 @@ class ReviewPipelineTest {
     void 실패하면_FAILED_와_error_code_를_남긴다() {
         when(structurePort.findElements(1L)).thenThrow(new IllegalStateException("파싱 결과 조회 실패"));
 
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         verify(store).markFailed(42L, "PIPELINE_ERROR");
         verify(store, never()).markDone(anyLong());
@@ -117,7 +127,7 @@ class ReviewPipelineTest {
     void 검산기가_없는_규칙은_건너뛴다() {
         when(rulesetVersionResolver.rulesOf(RULESET)).thenReturn(List.of(ruleWithCode("UNKNOWN_RULE")));
 
-        pipeline.run(42L);
+        pipeline.run(42L, 7L);
 
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<List<FindingDraft>> captor =
@@ -125,6 +135,80 @@ class ReviewPipelineTest {
         verify(store).saveFindings(eq(42L), captor.capture());
         assertThat(captor.getValue()).isEmpty();
         verify(store).markDone(42L);
+    }
+
+    @Test
+    void AI_단계_실패는_해당_error_code_로_남긴다() {
+        ReviewPipeline withFailingAi = pipelineWithAi(request -> {
+            throw new com.logiccheck.ai.ReviewAiException("AI_CALL_FAILED", "타임아웃");
+        });
+
+        withFailingAi.run(42L, 7L);
+
+        verify(store).markFailed(42L, "AI_CALL_FAILED");
+        verify(store, never()).markDone(anyLong());
+        verify(store, never()).saveFindings(anyLong(), any());
+    }
+
+    @Test
+    void AI_결과는_원문_대조를_통과한_것만_저장한다() {
+        ReviewPipeline withAi = pipelineWithAi(request -> new com.logiccheck.ai.ReviewAiResponse(
+                "m", "p", "t", List.of(
+                new com.logiccheck.ai.ReviewAiResponse.Finding("WARNING", null, 11, "원문에 있음", "설명",
+                        new BigDecimal("0.8"),
+                        List.of(new com.logiccheck.ai.ReviewAiResponse.Evidence("902", 11,
+                                "2027년 예상 매출 24억 원", null))),
+                new com.logiccheck.ai.ReviewAiResponse.Finding("INFO", null, 11, "원문에 없음", "설명",
+                        new BigDecimal("0.5"),
+                        List.of(new com.logiccheck.ai.ReviewAiResponse.Evidence("902", 11,
+                                "원문 어디에도 없는 문장", null))))));
+
+        withAi.run(42L, 7L);
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<FindingDraft>> captor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(store).saveFindings(eq(42L), captor.capture());
+        assertThat(captor.getValue()).extracting(FindingDraft::title)
+                .containsExactly("같은 항목의 수치가 서로 다릅니다", "원문에 있음");
+        verify(store).markDone(42L);
+    }
+
+    private ReviewPipeline pipelineWithAi(com.logiccheck.ai.ReviewAiClient client) {
+        com.logiccheck.document.port.DocumentQueryPort queryPort = (documentId, userId) ->
+                Optional.of(new com.logiccheck.document.port.DocumentQueryPort.DocumentMetaView(
+                        documentId, userId, "스텁 문서", 21, "DONE"));
+        com.logiccheck.ai.ReviewAiProperties aiOn = new com.logiccheck.ai.ReviewAiProperties(
+                true, "https://ai.example", null, null, null, null, null, null, null);
+        AiReviewStage aiStage = new AiReviewStage(aiOn, providerOf(client),
+                new com.logiccheck.ai.ReviewAiResponseValidator());
+        return new ReviewPipeline(store, structurePort, queryPort, rulesetVersionResolver,
+                new QuoteVerifier(), aiStage, List.of(new NumericConsistencyChecker()));
+    }
+
+    private static org.springframework.beans.factory.ObjectProvider<com.logiccheck.ai.ReviewAiClient>
+            providerOf(com.logiccheck.ai.ReviewAiClient client) {
+        return new org.springframework.beans.factory.ObjectProvider<>() {
+            @Override
+            public com.logiccheck.ai.ReviewAiClient getObject() {
+                return client;
+            }
+
+            @Override
+            public com.logiccheck.ai.ReviewAiClient getObject(Object... args) {
+                return client;
+            }
+
+            @Override
+            public com.logiccheck.ai.ReviewAiClient getIfAvailable() {
+                return client;
+            }
+
+            @Override
+            public com.logiccheck.ai.ReviewAiClient getIfUnique() {
+                return client;
+            }
+        };
     }
 
     private static ElementView element(long id, int page, String rawText, String value) {

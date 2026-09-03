@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://logiccheck.local/schema/ai-review-response.json",
+  "title": "AI 검토 응답",
+  "description": "AI 서버 -> BE. 이 스키마를 벗어나는 항목은 저장하지 않는다. 서버 측 검증은 com.logiccheck.ai.ReviewAiResponseValidator 가 같은 규칙을 강제한다.",
+  "type": "object",
+  "required": ["findings"],
+  "additionalProperties": true,
+  "properties": {
+    "modelVersion": { "type": "string" },
+    "promptVersion": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["severity", "title", "confidence", "evidence"],
+      "additionalProperties": true,
+      "properties": {
+        "severity": {
+          "description": "구 명세의 type 을 대체한다. FE constants/enums.js 의 SEVERITY 와 1:1.",
+          "enum": ["ERROR", "WARNING", "INFO"]
+        },
+        "sectionId": { "type": ["string", "null"] },
+        "page": { "type": ["integer", "null"], "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": ["string", "null"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": {
+          "description": "비어 있으면 그 항목을 반환하지 않는다. 근거 없는 지적은 저장되지 않는다.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["page", "quote"],
+      "additionalProperties": true,
+      "properties": {
+        "elementId": {
+          "description": "BE 가 보낸 elements[].id. bbox 는 이 값으로 파싱 결과에서 되짚으므로 AI 가 좌표를 만들지 않는다.",
+          "type": ["string", "null"]
+        },
+        "page": { "type": "integer", "minimum": 1 },
+        "quote": {
+          "description": "원문에 존재하는 문자열 그대로. 요약·재작성 금지. BE 가 pages.text_layer 와 대조해 불일치하면 해당 항목을 폐기한다.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

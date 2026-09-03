@@ -62,7 +62,7 @@ class ReviewJobServiceTest {
     void 분석을_시작하면_파이프라인이_트리거된다() {
         ReviewJob job = service.start(1L, 7L);
 
-        org.mockito.Mockito.verify(pipeline).runAsync(job.getId());
+        org.mockito.Mockito.verify(pipeline).runAsync(job.getId(), 7L);
     }
 
     @Test
@@ -70,7 +70,7 @@ class ReviewJobServiceTest {
         parseStatus = "PARSING";
 
         assertThatErrorCode(() -> service.start(1L, 7L), ErrorCode.DOCUMENT_NOT_READY);
-        org.mockito.Mockito.verify(pipeline, org.mockito.Mockito.never()).runAsync(anyLong());
+        org.mockito.Mockito.verify(pipeline, org.mockito.Mockito.never()).runAsync(anyLong(), anyLong());
     }
 
     @Test

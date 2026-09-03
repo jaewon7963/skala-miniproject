@@ -640,3 +640,120 @@ summary 갱신 (decided=3 open=2) 확인
 **후속 과제**
 - `REVENUE_SUM` · `LABOR_COST` 검산기 — `ExtractedElement` 스키마 확정 후 (위 6번)
 - S5b: AI 서버 연동 클라이언트 + JSON Schema 검증 + RAG 판단
+
+---
+
+## S5b — AI 서버 연동
+
+- 2026-09-03
+- 구현 범위: AI 클라이언트 · 응답 스키마 검증 · RAG 판단 · 인용문 대조 폐기.
+
+**추가**
+- `ai/ReviewAiClient.java` — 인터페이스
+- `ai/ReviewAiProperties.java` — `@ConfigurationProperties(prefix = "review.ai")`
+- `ai/ReviewAiRequest.java` · `ReviewAiResponse.java` — 명세 8-2 · 8-3 기준
+- `ai/HttpReviewAiClient.java` — `RestClient`, timeout 설정
+- `ai/StubReviewAiClient.java` — `@Primary @Profile("stub")`
+- `ai/ReviewAiResponseValidator.java` — 스키마 검증
+- `ai/ReviewAiException.java`
+- `review/pipeline/AiReviewStage.java` — D-10 4·5단계
+- `docs/ai/schema-finding.json` — AI 팀과 공유할 응답 스키마
+- 테스트 20건: `ReviewAiResponseValidatorTest`(11) · `AiReviewStageTest`(7) · `ReviewPipelineTest`(2)
+
+**변경**
+- `review/pipeline/ReviewPipeline.java` — AI 단계 연결, `ownerId` 전달, AI 실패 시 그 `error_code` 사용
+- `review/job/ReviewJobService.java` — 파이프라인에 `ownerId` 전달
+- `review/support/ReviewPersistenceConfig.java` — `@EnableConfigurationProperties`
+- `src/main/resources/application.properties` — AI 설정 전량
+
+**결정 · 편차**
+
+1. **`review.ai.enabled` 기본값이 `false` 다.** AI 서버 없이도 나머지 파이프라인이 돌아야 한다.
+   `false` 면 4·5단계를 건너뛰고 결정적 검산 결과만 저장한다.
+   `true` 인데 호출이나 스키마 검증이 실패하면 **Job 을 `FAILED`** 로 남긴다 (D-10 §8.10 문자 그대로).
+   부분 성공을 표현하려면 `PARTIAL` 상태가 필요한데 미결 #9 에서 추가하지 않기로 했다.
+
+2. **`error_code` 를 실패 원인별로 구분한다**: `AI_CALL_FAILED`(타임아웃·HTTP 오류) ·
+   `AI_RESPONSE_INVALID`(빈 본문·`findings` 누락) · `AI_CLIENT_MISSING`(설정 불일치) ·
+   `PIPELINE_ERROR`(그 외). `ErrorCode` enum 에는 추가하지 않았다 — HTTP 응답 코드가 아니라
+   `review_jobs.error_code` 컬럼용 진단 문자열이다.
+
+3. **AI 응답의 `type` 을 `severity` 로 바꿨고 값은 `ERROR` · `WARNING` · `INFO` 다.**
+   구 명세 8-3 은 `type: ERROR|NEEDS_CHECK|NO_EVIDENCE` 였지만 DEV3 F절이 SEVERITY 3종으로 바꿨다.
+   **← AI 팀과 확정 필요.** `docs/ai/schema-finding.json` 에 이 계약을 적어 뒀다.
+
+4. **JSON Schema 검증을 라이브러리 없이 코드로 강제했다.** A-8 이 의존성 추가를 제한하므로
+   검증 라이브러리를 넣지 않고 `ReviewAiResponseValidator` 가 같은 규칙을 검사한다.
+   스키마 문서(`docs/ai/schema-finding.json`)와 코드가 같은 규칙을 표현한다.
+   - 응답 전체가 규격을 벗어나면(`findings` 누락) **전체 거부** → Job `FAILED`
+   - 개별 항목이 규격을 벗어나면 **그 항목만 버리고** 나머지는 저장
+   - 검사 항목: `severity` enum · `title` 비어 있지 않음 · `confidence` 0~1 ·
+     `evidence` 1건 이상 · 각 `evidence` 의 `page ≥ 1` 과 `quote` 비어 있지 않음
+
+5. **bbox 는 AI 응답에서 받지 않는다.** `evidence[].elementId` 로 파싱 결과의 요소를 되짚어
+   그 좌표를 쓴다. **좌표의 출처를 파싱 결과로 한정해 AI 가 좌표를 지어내지 못하게 한다** (D-5).
+   모르는 `elementId` 면 좌표 없이 `quote` 만 남는다 — FE 가 텍스트 재탐색으로 복원한다.
+
+6. **AI 항목은 `rule_id` 를 채우지 않아 항상 `method = RAG` 로 파생되고 `calculation` 은 `null` 이다** (D-4).
+   AI 가 `method` 나 `calculation` 을 보내도 무시한다.
+
+7. **API Key 보안** (D-10 §8.10)
+   - 설정은 `review.ai.api-key=${REVIEW_AI_API_KEY:}` — 환경변수만 받는다. 파일에 값이 없다.
+   - `ReviewAiProperties.toString()` 을 직접 재정의해 키를 `***` 로 가린다.
+     record 기본 `toString` 은 모든 컴포넌트를 그대로 찍기 때문에 그대로 두면 설정을 로그에 찍는
+     순간 키가 새어 나간다. 단위 테스트로 고정했다.
+   - `RestClientException` 을 그대로 감싸지 않고 예외 클래스명만 담은 메시지를 새로 만든다 —
+     요청 본문이나 헤더가 로그에 섞이지 않게.
+   - 모델명 · Temperature · promptVersion · timeout 전부 설정으로 분리.
+
+8. **`HttpReviewAiClient` 에 `@Profile("!stub")` 을 붙였다.** `stub` 프로파일에서도 이 빈이
+   같이 만들어져 `base-url` 부재로 기동이 깨졌다. `base-url` 없이 `enabled=true` 면
+   기동 시점에 실패하는 것(fail-fast)은 의도한 동작이므로 유지하고, 스텁 프로파일에서만 제외했다.
+
+9. **`ownerId` 를 파이프라인까지 넘긴다.** `AiReviewStage` 가 `documentTitle` 을 보내려면
+   `DocumentQueryPort` 를 읽어야 하는데, 이 Port 는 **소유자 기준으로만** 조회를 허용한다(A-5 Port ①).
+   백그라운드 스레드에 사용자 컨텍스트가 없어 처음엔 `userId = null` 로 호출했는데,
+   개발자2 실구현에서는 항상 `Optional.empty()` 가 되어 제목이 조용히 `null` 이 된다.
+   Job 을 시작한 사용자를 `runAsync(jobId, ownerId)` 로 넘겨 계약을 지키도록 고쳤다.
+
+10. **`docs/ai/prompt-review.md` · `prompt-chat.md` 는 만들지 않았다** (명세 8-4 산출물).
+    프롬프트 작성은 AI 담당 영역이다. 응답 스키마만 계약으로 고정했다.
+
+**검증**
+
+- `./gradlew test` — 119건 통과, 실패 0
+- 하드코딩된 키·시크릿 스캔: 없음. 설정 로그는 마스킹된 `toString` 을 쓴다
+- 실제 Postgres + 스텁 AI 클라이언트 E2E (`REVIEW_AI_ENABLED=true`, `--review.stub.sample-structure=true`):
+
+  ```
+  파이프라인 로그:
+    인용문이 원문과 불일치해 검토사항을 폐기한다. page=9 title=폐기되어야 하는 항목
+    파이프라인 완료. jobId=25 ruleset=ruleset-2026.09.01 요소=3 결정적=1/1 AI=1/2 저장=2
+
+  GET /api/review-jobs/25/findings → 2건
+    ERROR   DETERMINISTIC  calc=있음  ev=2  같은 항목의 수치가 서로 다릅니다
+        p.9  bbox=있음  quote='2027년 예상 매출 18억 원'
+        p.11 bbox=있음  quote='2027년 예상 매출 24억 원'
+    WARNING RAG            calc=null  ev=1  근거 문서와 목표치의 연결이 확인되지 않습니다
+        p.9  bbox=있음  quote='2027년 예상 매출 18억 원'
+
+  폐기되어야 하는 항목이 남아 있는가: False
+  RAG 항목의 calculation 이 모두 null: True
+  모든 항목에 evidence 1건 이상: True
+
+  summary {total:2, ERROR:1, WARNING:1, INFO:0, open:2}
+  rulesetVersion = ruleset-2026.09.01 · errorCode = None
+  ```
+
+  스텁 AI 클라이언트는 **일부러 원문에 없는 인용문을 하나 섞어** 보낸다.
+  그 항목이 폐기되고 나머지만 저장되는 것을 위 로그와 결과가 함께 보여준다.
+
+- AI 실패 경로 (단위 테스트): `AI_CALL_FAILED` 를 던지면 `markFailed(42L, "AI_CALL_FAILED")`,
+  `markDone` 과 `saveFindings` 는 호출되지 않는다
+- 클라이언트 빈 부재: `AI_CLIENT_MISSING`
+- 비활성 시: AI 호출 없음, 빈 목록
+
+**후속 과제**
+- AI 응답의 `severity` 이름·값 AI 팀 확정 (위 3번)
+- AI 서버 엔드포인트·인증 방식 확보 후 `REVIEW_AI_BASE_URL`·`REVIEW_AI_API_KEY` 설정
+- `docs/ai/prompt-review.md` — AI 담당

@@ -1,6 +1,8 @@
 // TEMP: 개발자1(global/) 산출물 머지 시 이 파일을 삭제하고 import 를 교체한다. 상세는 work_log.md 참고.
 package com.logiccheck.review.support;
 
+import com.logiccheck.ai.ReviewAiProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -12,5 +14,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @Configuration
 @EntityScan(basePackages = "com.logiccheck")
 @EnableJpaRepositories(basePackages = "com.logiccheck")
+@EnableConfigurationProperties(ReviewAiProperties.class)
 public class ReviewPersistenceConfig {
 }
