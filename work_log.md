@@ -757,3 +757,79 @@ summary 갱신 (decided=3 open=2) 확인
 - AI 응답의 `severity` 이름·값 AI 팀 확정 (위 3번)
 - AI 서버 엔드포인트·인증 방식 확보 후 `REVIEW_AI_BASE_URL`·`REVIEW_AI_API_KEY` 설정
 - `docs/ai/prompt-review.md` — AI 담당
+
+---
+
+## 완료 기준 (DEV3 H절) 자체 검증
+
+실행 중인 애플리케이션에 실제 요청을 보내 34개 항목을 확인했다. 스크립트는 아래 조건으로 돌렸다.
+
+```bash
+docker compose up -d postgres            # 로컬 5432 가 점유돼 있으면 POSTGRES_PORT=5433
+cd BE/business
+REVIEW_AI_ENABLED=true DB_PORT=5433 ./gradlew bootRun \
+  --args='--spring.profiles.active=stub,seed --review.stub.sample-structure=true'
+```
+
+| 항목 | 결과 |
+|---|---|
+| 11개 엔드포인트(MVP1) Method·Path·Status Code 가 명세와 일치 | PASS |
+| 16번이 202 + `Location` 헤더 반환, 파이프라인을 기다리지 않음 | PASS |
+| 응답 시점의 `startedAt`·`finishedAt`·`rulesetVersion` 이 null | PASS |
+| 16번 선행 조건: 파싱 미완료 409 `DOCUMENT_NOT_READY` | PASS (S2 검증) |
+| 16번 선행 조건: 중복 실행 409 `JOB_ALREADY_RUNNING` | PASS |
+| 동시 요청에서 Job 이 1개만 생성됨 (DB 제약 포함) | PASS — 동시 6건 → 202 1건 · 409 5건 · DB 1행 |
+| `terminal` 이 `status ∈ {DONE, FAILED}` 에만 `true` | PASS |
+| `summary` 가 `status = DONE` 일 때만 채워지고 그 외 `null` | PASS |
+| `documentTitle`·`pageCount` 를 `DocumentQueryPort` 로 조합 | PASS — `documents` 직접 조회 없음 |
+| 21번이 Query 파라미터를 받지 않고 전체 반환 | PASS — `?severity=&sort=` 를 붙여도 같은 결과 |
+| 분석 미완료 Job 의 findings 가 빈 배열 | PASS |
+| `method` 가 `rule_id` 유무로 파생됨 | PASS — DETERMINISTIC·RAG 둘 다 확인 |
+| `calculation` 이 DETERMINISTIC 일 때만 채워짐 | PASS |
+| 모든 Finding 에 `evidence` 가 1건 이상, 각 evidence 에 `id`·`quote` 존재 | PASS |
+| `bbox` 가 0~1 상대 좌표 | PASS |
+| `embedding` 이 응답에 없음 | PASS — 엔티티에 매핑 자체가 없다 |
+| 판정 시 `finding_decisions` 에 이력이 쌓임 | PASS |
+| 완료된 Job 의 Finding 판정 시 409 `JOB_ALREADY_COMPLETED` | PASS |
+| 19번이 `status`·`parse_status` 를 변경하지 않음 | PASS — 완료 전후 `status = DONE` 불변 |
+| 주석에 `source`·`color` 필드가 없음 | PASS |
+| `author_id` 를 요청에서 받지 않음 | PASS — `authorId: "999"` 주입 시도 무시 |
+| 주석 soft delete 후 목록에서 제외됨 | PASS — DB 에는 `deleted_at` 채운 행이 남음 |
+| AI API Key 가 코드·로그에 없음 | PASS — 환경변수만, `toString` 마스킹, 하드코딩 스캔 무결과 |
+| 타인 리소스 접근 시 403 | PASS (단위 테스트 — 스텁 Port 가 항상 소유자를 반환해 E2E 로는 재현 불가) |
+| `id` 필드가 문자열, 날짜에 `+09:00` | PASS |
+| 응답을 래퍼로 감싸지 않음 | PASS |
+| 통합 시 스텁 파일 삭제 완료 | 미해당 — 개발자1·2 산출물 머지 시 수행 (위 통합 절차 참고) |
+
+**34/34 PASS.**
+
+---
+
+## 현재 상태 요약
+
+| 구분 | 상태 |
+|---|---|
+| MVP1 담당 API 11건 (16~19, 21~27) | 구현 · 검증 완료 |
+| 20번 검토 결과 PDF 내보내기 (MVP2) | 범위 밖 — PDF 라이브러리 의존성과 미결 #11 확정 후 |
+| `ReviewJobQueryPort` (개발자2 제공분) | 인터페이스 + 구현 완료. 개발자2 통합 대기 |
+| AI 파이프라인 | 결정적 검산 1종 + AI 연동 완료. AI 서버 엔드포인트 확보 대기 |
+| 테스트 | 119건 통과 |
+| 커밋 | `backend/pkt_init` 에 7건, `origin` push 완료 |
+
+### 팀에 확인이 필요한 것
+
+1. **응답 필드 3개** — DEV3 문서가 응답 필드를 전량 열거하지 않아 판단으로 넣거나 뺐다. v2 명세 대조 필요.
+   - 17번 `errorCode` — 넣음 (실패 사유 표시용)
+   - 21·22번 `jobId` — 넣음 (22번이 findingId 만 받아 소속 Job 을 알 수 없음)
+   - 21·22번 `decidedAt` — 뺌 (컬럼은 있음)
+2. **삭제된 문서 접근 시 404 vs 403** — `DocumentQueryPort.findMetaForOwner` 가 두 경우를
+   구분하지 못해 403 으로 통일했다. 구분이 필요하면 Port 시그니처 변경 → 개발자2 협의
+3. **검토 완료 후 주석 잠금 여부** — D-6 은 판정만 잠근다. 문서 문자 그대로 주석은 허용했다
+4. **`ExtractedElement` 에 대상 식별자·표 좌표 추가 여부** — `REVENUE_SUM`·`LABOR_COST` 같은
+   합계 검산은 현재 Port ② 시그니처로 표현할 수 없다 → 개발자2 협의 (S5a 6번)
+5. **AI 응답의 `severity` 이름·값** — 구 명세의 `type`(ERROR/NEEDS_CHECK/NO_EVIDENCE) 에서
+   DEV3 F절의 `severity`(ERROR/WARNING/INFO) 로 바꿨다 → AI 팀 확정
+6. **23번 응답에 생성된 주석 id 포함 여부** — 현재는 갱신된 Finding 만 반환한다
+7. **미결 #4 원문 뷰어 렌더링 방식** — `finding_evidence.bbox` 좌표계 기준에 영향 → 개발자2 협의
+8. **FE 변경 (DEV3 F절 6개 파일)** — 프론트 담당자 몫. 현재 FE 는 `VITE_USE_MOCK=true` 이고
+   `endpoints.js` 가 구 명세(`PATCH .../verdict`, annotations 없음)를 향한다
