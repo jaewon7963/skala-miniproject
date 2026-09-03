@@ -54,7 +54,7 @@ const navLinks = [
 
     <!-- 푸터 -->
     <footer class="foot">
-      <BrandMark />
+      <BrandMark tagline />
       <nav class="foot__links">
         <a href="#problem">문제</a>
         <a href="#features">기능</a>
@@ -67,7 +67,7 @@ const navLinks = [
         6조 주차장 개발자들 · AI-Ready Web Service Mini-project<br />
         업로드한 문서는 검토 목적으로만 처리됩니다
       </p>
-      <p class="foot__copy">© 2026 LogicCheck. All rights reserved.</p>
+      <p class="foot__copy">© 2026 BizXray. All rights reserved.</p>
     </footer>
   </div>
 </template>

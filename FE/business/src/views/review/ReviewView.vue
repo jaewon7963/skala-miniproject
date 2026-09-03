@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { documentApi } from '@/api'
+import { applyName } from '@/utils/documentNames'
 import { useReviewStore } from '@/stores/review'
 import { useUiStore } from '@/stores/ui'
 import AppButton from '@/components/common/AppButton.vue'
@@ -59,7 +60,7 @@ const documentTitle = ref('문서')
 onMounted(async () => {
   await review.load(props.jobId)
   if (review.job?.documentId) {
-    const doc = await documentApi.get(review.job.documentId)
+    const doc = applyName(await documentApi.get(review.job.documentId))
     documentTitle.value = doc.name
   }
 })

@@ -1,16 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { reviewApi } from '@/api'
-import { useUiStore } from '@/stores/ui'
 import { FINDING_TYPE_LABEL } from '@/constants/enums'
 import { formatDate } from '@/utils/format'
+import { applyName } from '@/utils/documentNames'
 import AppButton from '@/components/common/AppButton.vue'
 import AppInput from '@/components/common/AppInput.vue'
 import AppSelect from '@/components/common/AppSelect.vue'
 
 /** SHR-03 검토 의견서 · 내보내기 */
 const props = defineProps({ jobId: { type: String, required: true } })
-const ui = useUiStore()
 
 const report = ref(null)
 const settings = ref({ verdict: 'CONDITIONAL', dueDate: '2026-09-12', receiver: '사업기획팀' })
@@ -20,6 +19,13 @@ const verdictOptions = [
   { value: 'CONDITIONAL', label: '조건부 보완' },
   { value: 'REJECT', label: '부적합' },
 ]
+/** 라이브러리에서 변경한 문서명을 의견서에도 반영합니다 */
+const documentLabel = computed(() => {
+  if (!report.value) return '-'
+  const { name } = applyName({ id: report.value.documentId, name: report.value.documentName })
+  return report.value.documentVersion ? `${name} v${report.value.documentVersion}` : name
+})
+
 const verdictLabel = computed(
   () => verdictOptions.find((o) => o.value === settings.value.verdict)?.label ?? '-',
 )
@@ -34,26 +40,6 @@ function printPage() {
   window.print()
 }
 
-function exportCsv() {
-  const rows = [
-    ['#', '유형', '위치', '수정 지시'],
-    ...report.value.items.map((item) => [
-      item.no,
-      FINDING_TYPE_LABEL[item.type],
-      `p.${item.page}`,
-      item.instruction,
-    ]),
-  ]
-  const csv = rows.map((row) => row.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(',')).join('\n')
-  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'logiccheck-review.csv'
-  link.click()
-  URL.revokeObjectURL(url)
-  ui.success('CSV로 내보냈습니다')
-}
 </script>
 
 <template>
@@ -70,7 +56,6 @@ function exportCsv() {
       <p class="settings__note">포함 항목 : 검토 반영 항목만 · 인쇄 시 A4 1~2쪽으로 나눕니다</p>
 
       <div class="settings__actions">
-        <AppButton variant="secondary" block @click="exportCsv">CSV 내보내기</AppButton>
         <AppButton block @click="printPage">PDF로 저장 · 인쇄</AppButton>
       </div>
     </aside>
@@ -80,7 +65,7 @@ function exportCsv() {
       <header class="paper__head">
         <h1>검토 의견서</h1>
         <dl>
-          <div><dt>문서</dt><dd>{{ report.documentName }}</dd></div>
+          <div><dt>문서</dt><dd>{{ documentLabel }}</dd></div>
           <div><dt>검토자</dt><dd>{{ report.reviewer }} · {{ formatDate(report.reviewedAt) }}</dd></div>
           <div><dt>수신</dt><dd>{{ settings.receiver }}</dd></div>
           <div><dt>회신 기한</dt><dd>{{ settings.dueDate }}</dd></div>

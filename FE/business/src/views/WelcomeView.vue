@@ -64,7 +64,7 @@ const faqs = [
   },
   {
     q: '사업의 성공 가능성도 판정해 주나요?',
-    a: '아니요. LogicCheck는 사업 성공 가능성을 자동으로 판정하지 않습니다. 검산할 수 있는 오류와 전문가의 추가 판단이 필요한 항목을 구분해 제시하는 것이 원칙입니다.',
+    a: '아니요. BizXray는 사업 성공 가능성을 자동으로 판정하지 않습니다. 검산할 수 있는 오류와 전문가의 추가 판단이 필요한 항목을 구분해 제시하는 것이 원칙입니다.',
   },
   {
     q: 'AI가 잘못 지적하면 어떻게 하나요?',
@@ -153,7 +153,7 @@ const start = () =>
 
       <h2 class="section__title">
         AI의 결론만 받아들이지 말고<br />
-        <em>근거까지 확인하는 LogicCheck</em>와 함께하세요
+        <em>근거까지 확인하는 BizXray</em>와 함께하세요
       </h2>
 
       <div class="values">
@@ -167,7 +167,7 @@ const start = () =>
 
     <!-- ================= FEATURES ================= -->
     <section id="features" class="band">
-      <h2 class="band__title">검토가 쉬워지는 LogicCheck 기능들</h2>
+      <h2 class="band__title">검토가 쉬워지는 BizXray 기능들</h2>
       <p class="band__desc">원문 뷰어와 검토 항목을 한 화면에 붙여 확인 시간을 줄입니다</p>
 
       <ul class="tiles">

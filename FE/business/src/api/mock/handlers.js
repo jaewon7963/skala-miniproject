@@ -349,7 +349,9 @@ export const reviews = {
     const list = state.findings[jobId] || []
     return {
       jobId,
-      documentName: doc ? `${doc.name} v${doc.version}` : '문서',
+      documentId: doc?.id ?? null,
+      documentName: doc?.name ?? '문서',
+      documentVersion: doc?.version ?? null,
       reviewer: state.user.email,
       reviewedAt: new Date().toISOString(),
       verdict: 'CONDITIONAL', // 조건부 보완

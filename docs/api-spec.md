@@ -1,4 +1,4 @@
-# LogicCheck API 명세서 (Light v0.1)
+# BizXray API 명세서 (Light v0.1)
 
 > 2026-09-03 회의 결정사항 + 현재 FE 구현(`FE/business/src/api`)을 기준으로 작성한 **Light 버전**입니다.
 > 프론트가 먼저 진도를 낼 수 있도록 경로 · 요청 · 응답 · 상태코드만 확정하고,
@@ -528,7 +528,7 @@ Request body 없음.
 **Response `200`** — `application/pdf` 바이너리
 ```
 Content-Type: application/pdf
-Content-Disposition: attachment; filename="logiccheck-review-{documentId}.pdf"
+Content-Disposition: attachment; filename="bizxray-review-{documentId}.pdf"
 ```
 
 회의 결정대로 **원본 PDF에 하이라이트 + 주석을 반영한 결과물**입니다. 검토 의견서 양식이 아닙니다.

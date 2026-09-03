@@ -5,7 +5,7 @@ import BrandMark from '@/components/common/BrandMark.vue'
 <template>
   <div class="auth">
     <div class="auth__panel">
-      <RouterLink to="/" class="auth__brand"><BrandMark /></RouterLink>
+      <RouterLink to="/" class="auth__brand"><BrandMark tagline /></RouterLink>
       <slot />
     </div>
     <p class="auth__foot">업로드한 문서는 검토 목적으로만 처리됩니다.</p>

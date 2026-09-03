@@ -8,7 +8,7 @@ import {
   VERDICT,
 } from '@/constants/enums'
 
-const LAYOUT_KEY = 'logicheck.review.layout'
+const LAYOUT_KEY = 'bizxray.review.layout'
 const OUTLINE_RANGE = { min: 180, max: 420, default: 248 }
 const PANEL_RANGE = { min: 300, max: 620, default: 400 }
 
@@ -145,7 +145,7 @@ export const useReviewStore = defineStore('review', () => {
       findings.value = findingData
       panelTab.value = 'findings'
       try {
-        annotations.value = JSON.parse(localStorage.getItem(`logiccheck.annotations.${jobId}`) || '[]')
+        annotations.value = JSON.parse(localStorage.getItem(`bizxray.annotations.${jobId}`) || '[]')
       } catch {
         annotations.value = []
       }
@@ -232,7 +232,7 @@ export const useReviewStore = defineStore('review', () => {
   function persistAnnotations() {
     if (!job.value) return
     try {
-      localStorage.setItem(`logiccheck.annotations.${job.value.id}`, JSON.stringify(annotations.value))
+      localStorage.setItem(`bizxray.annotations.${job.value.id}`, JSON.stringify(annotations.value))
     } catch {
       /* 저장 실패 시 현재 세션에서는 유지합니다. */
     }
