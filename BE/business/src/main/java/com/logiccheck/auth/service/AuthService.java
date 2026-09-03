@@ -22,6 +22,7 @@ import com.logiccheck.global.exception.ErrorCode;
 import com.logiccheck.global.security.JwtTokenProvider;
 import com.logiccheck.user.dto.LoginRequest;
 import com.logiccheck.user.dto.SignUpRequest;
+import com.logiccheck.user.dto.UserResponse;
 import com.logiccheck.user.entity.User;
 import com.logiccheck.user.entity.UserStatus;
 import com.logiccheck.user.repository.UserRepository;
@@ -72,6 +73,14 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
         return issueTokens(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse me(Long userId) {
+        User user = userRepository.findById(userId)
+                .filter(found -> found.getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        return UserResponse.from(user);
     }
 
     private AuthResponse issueTokens(User user) {

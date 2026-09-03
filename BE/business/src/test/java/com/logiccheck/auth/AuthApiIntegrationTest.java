@@ -1,6 +1,7 @@
 package com.logiccheck.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.logiccheck.auth.entity.Session;
 import com.logiccheck.auth.repository.SessionRepository;
+import com.logiccheck.global.security.JwtTokenProvider;
 import com.logiccheck.user.entity.User;
 import com.logiccheck.user.repository.UserRepository;
 
@@ -57,6 +59,9 @@ class AuthApiIntegrationTest {
 
     @Autowired
     PasswordEncoder passwordEncoder;
+
+    @Autowired
+    JwtTokenProvider jwtTokenProvider;
 
     @Test
     void signsUpAndStoresOnlyPasswordAndRefreshTokenHashes() throws Exception {
@@ -127,5 +132,22 @@ class AuthApiIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(unknownEmail).isEqualTo(wrongPassword);
+    }
+
+    @Test
+    void returnsCurrentUserAndRejectsMissingToken() throws Exception {
+        User user = userRepository.save(User.create("me@example.com", passwordEncoder.encode("logic1234")));
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+
+        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(user.getId().toString()))
+                .andExpect(jsonPath("$.email").value("me@example.com"))
+                .andExpect(jsonPath("$.createdAt").value(org.hamcrest.Matchers.endsWith("+09:00")));
+
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.details").isEmpty());
     }
 }
