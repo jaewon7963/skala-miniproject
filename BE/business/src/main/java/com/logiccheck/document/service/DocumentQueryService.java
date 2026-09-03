@@ -1,91 +1,92 @@
 package com.logiccheck.document.service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.logiccheck.document.dto.CountsResponse;
-import com.logiccheck.document.dto.DocumentDetailResponse;
 import com.logiccheck.document.dto.DocumentListResponse;
+import com.logiccheck.document.dto.DocumentResponse;
 import com.logiccheck.document.dto.DocumentSort;
-import com.logiccheck.document.dto.DocumentSummaryResponse;
 import com.logiccheck.document.dto.PageResponse;
 import com.logiccheck.document.dto.ParseStatusResponse;
 import com.logiccheck.document.dto.Period;
 import com.logiccheck.document.dto.SectionResponse;
 import com.logiccheck.document.entity.Document;
 import com.logiccheck.document.entity.Section;
-import com.logiccheck.document.port.ReviewJobQueryPort;
-import com.logiccheck.document.port.ReviewJobQueryPort.LatestJobView;
 import com.logiccheck.document.repository.DocumentRepository;
 import com.logiccheck.document.repository.DocumentTagRepository;
 import com.logiccheck.document.repository.PageRepository;
 import com.logiccheck.document.repository.SectionRepository;
 import com.logiccheck.global.exception.BusinessException;
 import com.logiccheck.global.exception.ErrorCode;
-import com.logiccheck.tag.dto.TagResponse;
+import com.logiccheck.review.port.ReviewJobQueryPort;
+import com.logiccheck.review.port.ReviewJobQueryPort.LatestJobView;
+import com.logiccheck.tag.entity.Tag;
+import com.logiccheck.tag.repository.TagRepository;
 
 @Service
 @Transactional(readOnly = true)
 public class DocumentQueryService {
 
+    private static final String STATUS_ALL = "ALL";
+
     private final DocumentRepository documentRepository;
     private final DocumentTagRepository documentTagRepository;
     private final PageRepository pageRepository;
     private final SectionRepository sectionRepository;
+    private final TagRepository tagRepository;
     private final ReviewJobQueryPort reviewJobQueryPort;
 
     public DocumentQueryService(DocumentRepository documentRepository, DocumentTagRepository documentTagRepository,
                                  PageRepository pageRepository, SectionRepository sectionRepository,
-                                 ReviewJobQueryPort reviewJobQueryPort) {
+                                 TagRepository tagRepository, ReviewJobQueryPort reviewJobQueryPort) {
         this.documentRepository = documentRepository;
         this.documentTagRepository = documentTagRepository;
         this.pageRepository = pageRepository;
         this.sectionRepository = sectionRepository;
+        this.tagRepository = tagRepository;
         this.reviewJobQueryPort = reviewJobQueryPort;
     }
 
-    public DocumentListResponse list(Long ownerId, String status, String q, String period, String tagIdRaw,
+    /**
+     * 상태는 파싱 상태와 분석 작업을 합쳐 만든 파생 값이라 SQL WHERE 로 거를 수 없다.
+     * 그래서 검색·기간·태그까지는 DB에서 좁히고, 상태 필터와 페이지 자르기는 메모리에서 한다.
+     * 소유자 한 명의 문서 수를 다루는 화면이라 이 정도로 충분하다.
+     */
+    public DocumentListResponse list(Long ownerId, String status, String q, String period, String tagRaw,
                                       String sortRaw, int page, int size) {
-        if (status != null) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, Map.of("field", "status"));
-        }
         DocumentSort sort = DocumentSort.from(sortRaw);
         Period cutoffPeriod = Period.from(period);
-        Long tagId = parseTagId(tagIdRaw);
 
         List<Specification<Document>> specs = new ArrayList<>();
         specs.add(DocumentSpecifications.ownerIs(ownerId));
         specs.add(DocumentSpecifications.notDeleted());
         addIfNotNull(specs, DocumentSpecifications.titleContains(q));
         addIfNotNull(specs, DocumentSpecifications.updatedAfter(cutoffPeriod.cutoff()));
-        addIfNotNull(specs, DocumentSpecifications.hasTag(tagId));
-        Specification<Document> spec = Specification.allOf(specs);
+        addIfNotNull(specs, DocumentSpecifications.hasTag(resolveTagId(tagRaw)));
 
-        Sort springSort = sort == DocumentSort.NAME_ASC
-                ? Sort.by(Sort.Direction.ASC, "title")
-                : Sort.by(Sort.Direction.DESC, "updatedAt");
-
-        var result = documentRepository.findAll(spec, PageRequest.of(page - 1, size, springSort));
-
-        List<Long> docIds = result.getContent().stream().map(Document::getId).toList();
+        List<Document> matched = documentRepository.findAll(Specification.allOf(specs));
+        List<Long> docIds = matched.stream().map(Document::getId).toList();
         Map<Long, LatestJobView> jobs = reviewJobQueryPort.findLatestByDocumentIds(docIds);
-        Map<Long, List<TagResponse>> tagsByDoc = tagsByDocumentId(docIds);
+        Map<Long, List<String>> tagsByDoc = tagNamesByDocumentId(docIds);
 
-        List<DocumentSummaryResponse> items = result.getContent().stream()
-                .map(d -> DocumentSummaryResponse.of(d, DisplayStatusCalculator.calculate(d.getParseStatus(),
-                        jobs.get(d.getId())), tagsByDoc.getOrDefault(d.getId(), List.of())))
+        List<DocumentResponse> all = matched.stream()
+                .map(d -> toResponse(d, jobs.get(d.getId()), tagsByDoc.getOrDefault(d.getId(), List.of())))
+                .filter(d -> isAll(status) || d.status().equals(status))
+                .sorted(comparator(sort))
                 .toList();
 
-        return new DocumentListResponse(items, result.getTotalElements(), page, size, counts(ownerId));
+        int from = Math.min((page - 1) * size, all.size());
+        int to = Math.min(from + size, all.size());
+        return new DocumentListResponse(all.subList(from, to), all.size(), page, size, counts(ownerId));
     }
 
     public CountsResponse counts(Long ownerId) {
@@ -93,31 +94,32 @@ public class DocumentQueryService {
         Map<Long, LatestJobView> jobs = reviewJobQueryPort.findLatestByDocumentIds(
                 all.stream().map(DocumentRepository.DocIdStatus::getId).toList());
 
-        long total = all.size();
-        long inReview = 0;
-        long completed = 0;
-        long failed = 0;
-        for (DocumentRepository.DocIdStatus d : all) {
-            String displayStatus = DisplayStatusCalculator.calculate(d.getParseStatus(), jobs.get(d.getId()));
-            if (DisplayStatusCalculator.isFailed(displayStatus)) {
-                failed++;
-            } else if ("IN_REVIEW".equals(displayStatus)) {
-                inReview++;
-            } else if ("COMPLETED".equals(displayStatus)) {
-                completed++;
-            }
-        }
-        return new CountsResponse(total, inReview, completed, failed);
+        Map<String, Long> byStatus = all.stream()
+                .map(d -> DisplayStatusCalculator.calculate(d.getParseStatus(), jobs.get(d.getId())))
+                .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
+
+        return new CountsResponse(all.size(),
+                byStatus.getOrDefault(DisplayStatusCalculator.IDLE, 0L),
+                byStatus.getOrDefault(DisplayStatusCalculator.PARSING, 0L),
+                byStatus.getOrDefault(DisplayStatusCalculator.ANALYZING, 0L),
+                byStatus.getOrDefault(DisplayStatusCalculator.REVIEWING, 0L),
+                byStatus.getOrDefault(DisplayStatusCalculator.DONE, 0L),
+                byStatus.getOrDefault(DisplayStatusCalculator.FAILED, 0L));
     }
 
-    public DocumentDetailResponse detail(Long ownerId, Long documentId) {
+    public DocumentResponse detail(Long ownerId, Long documentId) {
         Document document = getOwnedOrThrow(documentId, ownerId);
+        return describe(document);
+    }
+
+    /** 문서를 이미 확보한 호출자(업로드·수정)가 같은 모양의 응답을 만들 때 쓴다. */
+    public DocumentResponse describe(Document document) {
+        Long documentId = document.getId();
         LatestJobView job = reviewJobQueryPort.findLatestByDocumentIds(List.of(documentId)).get(documentId);
-        List<TagResponse> tags = documentTagRepository.findByDocument_Id(documentId).stream()
-                .map(dt -> TagResponse.from(dt.getTag()))
+        List<String> tags = documentTagRepository.findByDocument_Id(documentId).stream()
+                .map(dt -> dt.getTag().getName())
                 .toList();
-        return DocumentDetailResponse.of(document, DisplayStatusCalculator.calculate(document.getParseStatus(), job),
-                tags);
+        return toResponse(document, job, tags);
     }
 
     public Document getForDownload(Long ownerId, Long documentId) {
@@ -130,8 +132,7 @@ public class DocumentQueryService {
 
     public List<SectionResponse> sections(Long ownerId, Long documentId) {
         getOwnedOrThrow(documentId, ownerId);
-        List<Section> flat = sectionRepository.findByDocument_IdOrderByOrderNoAsc(documentId);
-        return buildTree(flat);
+        return buildTree(sectionRepository.findByDocument_IdOrderByOrderNoAsc(documentId));
     }
 
     public List<PageResponse> pages(Long ownerId, Long documentId, Integer from, Integer to) {
@@ -143,7 +144,7 @@ public class DocumentQueryService {
                 .toList();
     }
 
-    Document getOwnedOrThrow(Long documentId, Long ownerId) {
+    public Document getOwnedOrThrow(Long documentId, Long ownerId) {
         return documentRepository.findByIdAndOwnerIdAndDeletedAtIsNull(documentId, ownerId)
                 .orElseThrow(() -> {
                     if (documentRepository.existsByIdAndDeletedAtIsNull(documentId)) {
@@ -153,29 +154,46 @@ public class DocumentQueryService {
                 });
     }
 
-    private Map<Long, List<TagResponse>> tagsByDocumentId(List<Long> docIds) {
+    private DocumentResponse toResponse(Document document, LatestJobView job, List<String> tags) {
+        String status = DisplayStatusCalculator.calculate(document.getParseStatus(), job);
+        return DocumentResponse.of(document, status, tags, job == null ? null : job.jobId());
+    }
+
+    private boolean isAll(String status) {
+        return status == null || status.isBlank() || STATUS_ALL.equals(status);
+    }
+
+    private Comparator<DocumentResponse> comparator(DocumentSort sort) {
+        return sort == DocumentSort.NAME_ASC
+                ? Comparator.comparing(DocumentResponse::name)
+                : Comparator.comparing(DocumentResponse::updatedAt).reversed();
+    }
+
+    /** 화면은 태그를 이름으로 다루므로 코드·이름·숫자 id 어느 쪽이 와도 받아준다. 못 찾으면 필터를 걸지 않는다. */
+    private Long resolveTagId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return tagRepository.findAllByOrderByOrderNoAsc().stream()
+                .filter(tag -> raw.equalsIgnoreCase(tag.getCode()) || raw.equals(tag.getName())
+                        || raw.equals(String.valueOf(tag.getId())))
+                .map(Tag::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Map<Long, List<String>> tagNamesByDocumentId(List<Long> docIds) {
         if (docIds.isEmpty()) {
             return Map.of();
         }
         return documentTagRepository.findRowsByDocumentIdIn(docIds).stream()
                 .collect(Collectors.groupingBy(DocumentTagRepository.DocumentTagRow::getDocumentId,
-                        Collectors.mapping(row -> TagResponse.from(row.getTag()), Collectors.toList())));
+                        Collectors.mapping(row -> row.getTag().getName(), Collectors.toList())));
     }
 
     private void addIfNotNull(List<Specification<Document>> specs, Specification<Document> spec) {
         if (spec != null) {
             specs.add(spec);
-        }
-    }
-
-    private Long parseTagId(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return Long.valueOf(raw);
-        } catch (NumberFormatException e) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, Map.of("field", "tagId"));
         }
     }
 

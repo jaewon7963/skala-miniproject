@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.logiccheck.document.dto.DocumentDetailResponse;
+import com.logiccheck.document.dto.DocumentResponse;
 import com.logiccheck.document.dto.DocumentUpdateRequest;
 import com.logiccheck.document.entity.Document;
 import com.logiccheck.document.entity.DocumentTag;
@@ -24,7 +24,6 @@ import com.logiccheck.document.repository.DocumentTagRepository;
 import com.logiccheck.document.storage.LocalFileStorageService;
 import com.logiccheck.global.exception.BusinessException;
 import com.logiccheck.global.exception.ErrorCode;
-import com.logiccheck.tag.dto.TagResponse;
 import com.logiccheck.tag.entity.Tag;
 import com.logiccheck.tag.repository.TagRepository;
 
@@ -55,7 +54,7 @@ public class DocumentCommandService {
         this.maxUploadSizeBytes = maxUploadSizeBytes;
     }
 
-    public DocumentDetailResponse upload(Long ownerId, MultipartFile file) {
+    public DocumentResponse upload(Long ownerId, MultipartFile file) {
         byte[] content = readAll(file);
 
         if (!startsWithPdfMagic(content)) {
@@ -81,10 +80,21 @@ public class DocumentCommandService {
         }
 
         eventPublisher.publishEvent(new DocumentUploadedEvent(document.getId()));
-        return DocumentDetailResponse.of(document, "PARSE_PENDING", List.of());
+        return DocumentResponse.of(document, DisplayStatusCalculator.PARSING, List.of(), null);
     }
 
-    public DocumentDetailResponse update(Long ownerId, Long documentId, DocumentUpdateRequest request) {
+    /** 화면의 문서명 변경. 이름만 바꾸고 태그는 건드리지 않는다. */
+    public DocumentResponse rename(Long ownerId, Long documentId, String name) {
+        Document document = documentQueryService.getOwnedOrThrow(documentId, ownerId);
+        if (name == null || name.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, Map.of("field", "name"));
+        }
+        document.rename(name.trim());
+        document.touch();
+        return documentQueryService.describe(document);
+    }
+
+    public DocumentResponse update(Long ownerId, Long documentId, DocumentUpdateRequest request) {
         Document document = documentQueryService.getOwnedOrThrow(documentId, ownerId);
 
         if (request.title() != null) {
@@ -93,17 +103,11 @@ public class DocumentCommandService {
             }
             document.rename(request.title());
         }
-        List<TagResponse> tags;
         if (request.tagIds() != null) {
-            tags = replaceTags(document, request.tagIds());
-        } else {
-            tags = documentTagRepository.findByDocument_Id(documentId).stream()
-                    .map(dt -> TagResponse.from(dt.getTag()))
-                    .toList();
+            replaceTags(document, request.tagIds());
         }
-
-        String displayStatus = DisplayStatusCalculator.calculate(document.getParseStatus(), null);
-        return DocumentDetailResponse.of(document, displayStatus, tags);
+        document.touch();
+        return documentQueryService.describe(document);
     }
 
     public void delete(Long ownerId, Long documentId) {
@@ -111,7 +115,7 @@ public class DocumentCommandService {
         document.softDelete();
     }
 
-    private List<TagResponse> replaceTags(Document document, List<String> tagIds) {
+    private void replaceTags(Document document, List<String> tagIds) {
         List<Long> ids = tagIds.stream().map(Long::valueOf).toList();
         List<Tag> found = tagRepository.findAllById(ids);
         if (found.size() != ids.size()) {
@@ -122,8 +126,6 @@ public class DocumentCommandService {
         documentTagRepository.flush();
         List<DocumentTag> links = found.stream().map(tag -> DocumentTag.of(document, tag)).toList();
         documentTagRepository.saveAll(links);
-
-        return found.stream().map(TagResponse::from).toList();
     }
 
     private byte[] readAll(MultipartFile file) {
