@@ -2,7 +2,9 @@ package com.logiccheck.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -240,5 +242,27 @@ class AuthApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"" + second.get("refreshToken").asText() + "\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void handlesCorsMissingRouteAndTamperedToken() throws Exception {
+        User user = userRepository.save(User.create("security@example.com", passwordEncoder.encode("logic1234")));
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+
+        mockMvc.perform(options("/api/users/me")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+
+        mockMvc.perform(get("/api/missing")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mockMvc.perform(get("/api/users/me")
+                        .header("Authorization", "Bearer " + accessToken + "x"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 }
