@@ -171,3 +171,22 @@ curl -H 'X-User-Id: 1' http://localhost:8081/api/review-jobs/1
 - `BusinessApplicationTests` 복원 (Testcontainers)
 - `findings.decided_at` 응답 포함 여부 팀 확인
 - 20번 export(MVP2) 는 범위 밖 — PDF 라이브러리 의존성과 미결 #11(인증 방식) 확정 후
+
+---
+
+## S1 — 계약 우선: `ReviewJobQueryPort`
+
+- 2026-09-03
+- 구현 범위: Port 인터페이스 파일만. 구현은 S2 에서 붙인다 (DEV3 C-1).
+
+**추가**
+- `BE/business/src/main/java/com/logiccheck/review/port/ReviewJobQueryPort.java`
+
+내용은 A-5 Port ③ 그대로다. 복수 조회 시그니처를 단건으로 바꾸면 개발자2 쪽에서 N+1 이 발생한다(E-1).
+
+**검증**
+- `./gradlew compileJava` 통과
+
+**후속 과제**
+- **개발자2에게 통보 필요.** 문서 목록의 `displayStatus` · `counts` 계산이 이 Port 를 기다린다.
+  구현 없이 인터페이스만 먼저 올렸으니 소비자 쪽 컴파일은 지금부터 가능하다.
