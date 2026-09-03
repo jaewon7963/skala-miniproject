@@ -3,6 +3,7 @@ package com.logiccheck.review.job;
 import com.logiccheck.document.port.DocumentQueryPort;
 import com.logiccheck.document.port.DocumentQueryPort.DocumentMetaView;
 import com.logiccheck.global.exception.ErrorCode;
+import com.logiccheck.review.job.dto.JobSummaryView;
 import com.logiccheck.review.support.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,9 @@ import static org.mockito.Mockito.when;
 /** 명세 16 · 17 · 18 의 선행 조건과 상태 전이 (DEV3 D-1 · D-2). */
 class ReviewJobServiceTest {
 
+    private static final JobSummaryView SUMMARY =
+            new JobSummaryView(8, java.util.Map.of("ERROR", 3L, "WARNING", 3L, "INFO", 2L), 2, 1, 1, 6);
+
     private ReviewJobRepository repository;
     private String parseStatus;
     private boolean owned;
@@ -36,7 +40,7 @@ class ReviewJobServiceTest {
         DocumentQueryPort port = (documentId, userId) -> owned
                 ? Optional.of(new DocumentMetaView(documentId, userId, "스텁 문서", 21, parseStatus))
                 : Optional.empty();
-        service = new ReviewJobService(repository, port);
+        service = new ReviewJobService(repository, port, jobId -> SUMMARY);
 
         when(repository.existsByDocumentIdAndStatusIn(anyLong(), any())).thenReturn(false);
         when(repository.saveAndFlush(any(ReviewJob.class)))
@@ -124,6 +128,26 @@ class ReviewJobServiceTest {
     }
 
     @Test
+    void summary_는_status_가_DONE_일_때만_채워진다() {
+        ReviewJob done = withStatus(withId(ReviewJob.pending(1L), 42L), JobStatus.DONE);
+        when(repository.findById(42L)).thenReturn(Optional.of(done));
+
+        assertThat(service.findForOwner(42L, 7L).summary()).isEqualTo(SUMMARY);
+    }
+
+    @Test
+    void summary_는_DONE_이_아니면_null_이다() {
+        for (JobStatus status : new JobStatus[]{JobStatus.PENDING, JobStatus.RUNNING, JobStatus.FAILED}) {
+            ReviewJob job = withStatus(withId(ReviewJob.pending(1L), 42L), status);
+            when(repository.findById(42L)).thenReturn(Optional.of(job));
+
+            assertThat(service.findForOwner(42L, 7L).summary())
+                    .as("status = %s", status)
+                    .isNull();
+        }
+    }
+
+    @Test
     void terminal_은_DONE_FAILED_에만_true_다() {
         assertThat(JobStatus.PENDING.isTerminal()).isFalse();
         assertThat(JobStatus.RUNNING.isTerminal()).isFalse();
@@ -138,6 +162,11 @@ class ReviewJobServiceTest {
 
     private static ReviewJob withId(ReviewJob job, long id) {
         ReflectionTestUtils.setField(job, "id", id);
+        return job;
+    }
+
+    private static ReviewJob withStatus(ReviewJob job, JobStatus status) {
+        ReflectionTestUtils.setField(job, "status", status);
         return job;
     }
 

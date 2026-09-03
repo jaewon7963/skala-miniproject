@@ -43,7 +43,7 @@ class ReviewJobControllerTest {
     void 분석_시작은_202_와_Location_헤더를_반환한다() throws Exception {
         ReviewJob job = pendingJob(42L);
         when(service.start(1L, 7L)).thenReturn(job);
-        when(service.findForOwner(42L, 7L)).thenReturn(new JobWithDocument(job, META));
+        when(service.findForOwner(42L, 7L)).thenReturn(new JobWithDocument(job, META, null));
 
         mockMvc.perform(post("/api/review-jobs")
                         .header("X-User-Id", "7")
@@ -65,7 +65,7 @@ class ReviewJobControllerTest {
     @Test
     void 응답은_래퍼로_감싸지_않고_명세에_없는_필드를_담지_않는다() throws Exception {
         ReviewJob job = pendingJob(42L);
-        when(service.findForOwner(42L, 7L)).thenReturn(new JobWithDocument(job, META));
+        when(service.findForOwner(42L, 7L)).thenReturn(new JobWithDocument(job, META, null));
 
         mockMvc.perform(get("/api/review-jobs/42").header("X-User-Id", "7"))
                 .andExpect(status().isOk())
@@ -129,7 +129,7 @@ class ReviewJobControllerTest {
     @Test
     void 최근_작업_조회는_200_과_Job_을_반환한다() throws Exception {
         ReviewJob job = pendingJob(42L);
-        when(service.findLatestForOwner(1L, 7L)).thenReturn(new JobWithDocument(job, META));
+        when(service.findLatestForOwner(1L, 7L)).thenReturn(new JobWithDocument(job, META, null));
 
         mockMvc.perform(get("/api/documents/1/review-jobs/latest").header("X-User-Id", "7"))
                 .andExpect(status().isOk())

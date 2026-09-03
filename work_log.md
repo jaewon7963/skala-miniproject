@@ -268,3 +268,92 @@ curl -H 'X-User-Id: 1' http://localhost:8081/api/review-jobs/1
 - Port ③ 은 개발자2가 소비할 때 통합 검증한다. 지금은 JPQL 부트스트랩 검증 + 동등 SQL 확인까지다
 - 삭제된 문서 접근 시 404 vs 403 (위 2번)
 - 17번 응답의 `errorCode` 포함 여부 (위 5번)
+
+---
+
+## S3 — Finding 읽기 경로: API 21 · 22 + summary
+
+- 2026-09-03
+- 구현 범위: 검토사항 목록(21) · 상세(22), 명세 17 의 `summary` 집계 완성.
+  AI 파이프라인 대신 시드 데이터로 검증했다.
+
+**추가**
+- `review/finding/Severity.java` · `FindingStatus.java` · `FindingMethod.java`
+- `review/finding/Finding.java` · `FindingEvidence.java` · `FindingElement.java`
+- `review/finding/FindingRepository.java` · `SeverityStatusCount.java`
+- `review/finding/FindingService.java` · `FindingController.java` · `FindingSummaryProvider.java`
+- `review/finding/dto/FindingResponse.java` (`CalculationView` · `EvidenceView` · `BBoxView` 중첩)
+- `review/job/JobFindingSummary.java` — job 이 finding 내부를 직접 알지 않게 하는 경계
+- `src/main/resources/db/seed/review_seed.sql` · `review/support/ReviewSeedRunner.java`
+- 테스트 15건: `FindingServiceTest`(7) · `FindingControllerTest`(6) · `FindingSummaryProviderTest`(2)
+
+**변경**
+- `review/job/ReviewJobService.java` — `JobWithDocument` 에 `summary` 추가, `status = DONE` 일 때만 채움
+- `review/job/ReviewJobController.java` — `summary` 전달
+- `ReviewJobServiceTest` — summary 검증 2건 추가 (총 14건)
+
+**결정 · 편차**
+
+1. **`embedding` 을 엔티티에 아예 매핑하지 않았다.** 컬럼은 DDL 에 있지만 `Finding` 에 필드가 없다.
+   응답에 새어 나갈 경로가 원천적으로 없다. `ddl-auto=validate` 는 DB 쪽 여분 컬럼을 문제 삼지 않는다.
+
+2. **목록 정렬을 서비스에서 수행한다.** `severity` 의 의미 순서(ERROR > WARNING > INFO)가
+   문자열 정렬(ERROR · INFO · WARNING)과 달라 SQL `ORDER BY severity` 로는 원하는 순서가 안 나온다.
+   `findings(job_id, severity, confidence DESC)` 인덱스는 `job_id` 조회를 받고,
+   최종 정렬은 `FindingService.LIST_ORDER` 가 한다. 21번은 한 Job 전체를 반환하므로(D-4)
+   페이징이 없고 집합이 작아 메모리 정렬로 충분하다.
+   `confidence` 가 null 이면 같은 severity 안에서 뒤로 보낸다.
+
+3. **`@EntityGraph(attributePaths = "evidence")`** 로 근거를 함께 가져온다. 없으면 목록에서 N+1 이 난다.
+
+4. **`FAILED` Job 은 findings 를 그대로 반환한다.** D-4 의 "분석 미완료" 는 `PENDING` · `RUNNING` 이고
+   `FAILED` 는 종료 상태다. 부분 실패로 일부 항목이 저장됐을 수 있어 빈 배열로 만들지 않았다.
+   대신 `summary` 는 D-3 대로 `DONE` 일 때만 채운다 — `FAILED` 면 `null` 이다.
+
+5. **`calculation` 은 값이 하나도 없으면 `null`** 이다. `rule_id` 가 있어도 calc_* 네 컬럼이 모두
+   비었으면 빈 객체 대신 `null` 을 내린다.
+
+6. **`bbox` 는 네 값이 모두 있을 때만 내려보낸다.** 하나라도 없으면 `bbox: null` 이고,
+   FE 는 `quote` 재탐색으로 복원한다 (D-5).
+
+7. **`evidence[]` 에 `blockId` · `prefix` · `suffix` 를 넣지 않았다.** ERD 에 Block 테이블이 없어
+   FE 의 `anchorId` 를 `evidence.id` 로 대체한다(D-5). `prefix`/`suffix` 는 ERD 에 컬럼이 없다.
+   `charStart` · `charEnd` 는 컬럼이 있어 포함했다.
+
+8. **`FindingResponse.jobId` 를 포함했다.** 22번(상세)이 findingId 만 받으므로 소속 Job 을
+   알 방법이 없으면 FE 가 곤란하다. DEV3 문서가 21·22 응답 필드를 전량 열거하지 않아 판단으로 넣었다.
+   **← 팀 확인 필요** (`errorCode` · `decidedAt` 과 함께)
+
+9. **시드는 `db/seed/` 에 두고 `seed` 프로파일에서만 실행한다.** `db/migration/` 에 넣으면
+   Flyway 가 운영에도 적용한다. `document_id = 900001` 로 표시해 실행마다 지우고 다시 만든다.
+
+**검증**
+
+- `./gradlew test` — 38건 통과 (Job 23 · Finding 15), 실패 0
+- `ddl-auto=validate` 통과 — `Finding` · `FindingEvidence` · `FindingElement` 매핑이 스키마와 일치
+- 시드 적용 후 실제 Postgres 대상 curl:
+
+  ```
+  21) GET /api/review-jobs/16/findings  → 200, 5건
+      ERROR   conf=0.96  DETERMINISTIC  calc=있음  ev=1
+      ERROR   conf=0.91  DETERMINISTIC  calc=있음  ev=1
+      WARNING conf=0.84  RAG            calc=null  ev=1
+      WARNING conf=0.78  RAG            calc=null  ev=1
+      INFO    conf=0.65  RAG            calc=null  ev=1
+      embedding 키 존재: False
+      모든 항목에 evidence 1건 이상: True
+      모든 evidence 에 id·quote: True
+      bbox 0~1 범위: True
+  22) GET /api/findings/1               → 200, calculation·evidence·bbox 정상
+  ```
+
+- **summary 불변식** (판정 2건 주입 후):
+  `{"total": 5, "bySeverity": {"ERROR": 2, "WARNING": 2, "INFO": 1}, "decided": 2, "accepted": 1, "rejected": 1, "open": 3}`
+  `decided == accepted + rejected`, `total == sum(bySeverity)`, `total == decided + open` 모두 성립
+- **summary 조건**: `RUNNING` → `null`, `FAILED` → `null`, `DONE` → 채워짐
+- **21번 빈 배열**: `RUNNING` Job → `[]` + `200` (404 아님)
+- **FAILED Job**: findings 5건 반환, `terminal: true`, `errorCode: "AI_TIMEOUT"`, `summary: null`
+
+**후속 과제**
+- 응답 추가 필드 3개(`errorCode` · `jobId` · `decidedAt` 제외 여부) v2 명세 대조
+- `FindingElement` 는 엔티티만 만들었고 파이프라인(S5)에서 채운다

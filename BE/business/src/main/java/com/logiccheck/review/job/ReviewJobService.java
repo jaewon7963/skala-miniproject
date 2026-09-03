@@ -3,6 +3,7 @@ package com.logiccheck.review.job;
 import com.logiccheck.document.port.DocumentQueryPort;
 import com.logiccheck.document.port.DocumentQueryPort.DocumentMetaView;
 import com.logiccheck.global.exception.ErrorCode;
+import com.logiccheck.review.job.dto.JobSummaryView;
 import com.logiccheck.review.support.BusinessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -16,10 +17,14 @@ public class ReviewJobService {
 
     private final ReviewJobRepository reviewJobRepository;
     private final DocumentQueryPort documentQueryPort;
+    private final JobFindingSummary jobFindingSummary;
 
-    public ReviewJobService(ReviewJobRepository reviewJobRepository, DocumentQueryPort documentQueryPort) {
+    public ReviewJobService(ReviewJobRepository reviewJobRepository,
+                            DocumentQueryPort documentQueryPort,
+                            JobFindingSummary jobFindingSummary) {
         this.reviewJobRepository = reviewJobRepository;
         this.documentQueryPort = documentQueryPort;
+        this.jobFindingSummary = jobFindingSummary;
     }
 
     /**
@@ -52,7 +57,7 @@ public class ReviewJobService {
     public JobWithDocument findForOwner(Long jobId, Long userId) {
         ReviewJob job = reviewJobRepository.findById(jobId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        return new JobWithDocument(job, requireOwnedDocument(job.getDocumentId(), userId));
+        return view(job, requireOwnedDocument(job.getDocumentId(), userId));
     }
 
     /** 명세 18. Job 이 없으면 404 NO_REVIEW_JOB — FE 가 업로드 화면으로 보낸다. */
@@ -61,7 +66,15 @@ public class ReviewJobService {
         DocumentMetaView meta = requireOwnedDocument(documentId, userId);
         ReviewJob job = reviewJobRepository.findFirstByDocumentIdOrderByIdDesc(documentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_REVIEW_JOB));
-        return new JobWithDocument(job, meta);
+        return view(job, meta);
+    }
+
+    /** summary 는 status = DONE 일 때만 채우고 그 외에는 null 이다 (DEV3 D-3). */
+    private JobWithDocument view(ReviewJob job, DocumentMetaView meta) {
+        JobSummaryView summary = job.getStatus() == JobStatus.DONE
+                ? jobFindingSummary.summarize(job.getId())
+                : null;
+        return new JobWithDocument(job, meta, summary);
     }
 
     /**
@@ -73,6 +86,6 @@ public class ReviewJobService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
     }
 
-    public record JobWithDocument(ReviewJob job, DocumentMetaView document) {
+    public record JobWithDocument(ReviewJob job, DocumentMetaView document, JobSummaryView summary) {
     }
 }

@@ -46,21 +46,21 @@ public class ReviewJobController {
         JobWithDocument found = reviewJobService.findForOwner(job.getId(), user.userId());
         return ResponseEntity.accepted()
                 .location(URI.create("/api/review-jobs/" + job.getId()))
-                .body(ReviewJobResponse.of(found.job(), found.document(), null));
+                .body(ReviewJobResponse.of(found.job(), found.document(), found.summary()));
     }
 
     /** 17. 분석 작업 조회 — FE 폴링과 검토 화면 진입에 쓰인다. */
     @GetMapping("/review-jobs/{jobId}")
     public ReviewJobResponse get(@PathVariable Long jobId, @CurrentUser UserPrincipal user) {
         JobWithDocument found = reviewJobService.findForOwner(jobId, user.userId());
-        return ReviewJobResponse.of(found.job(), found.document(), null);
+        return ReviewJobResponse.of(found.job(), found.document(), found.summary());
     }
 
     /** 18. 최근 분석 작업 조회. */
     @GetMapping("/documents/{documentId}/review-jobs/latest")
     public ReviewJobResponse latest(@PathVariable Long documentId, @CurrentUser UserPrincipal user) {
         JobWithDocument found = reviewJobService.findLatestForOwner(documentId, user.userId());
-        return ReviewJobResponse.of(found.job(), found.document(), null);
+        return ReviewJobResponse.of(found.job(), found.document(), found.summary());
     }
 
     private static Long parseId(String raw, String field) {
