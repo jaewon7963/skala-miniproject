@@ -20,7 +20,7 @@ export const useDocumentStore = defineStore('documents', () => {
     sort: DOC_SORT.UPDATED_DESC,
     tag: null,
     page: 1,
-    size: 20,
+    size: 10,
   })
 
   async function fetchList(patch = {}) {
@@ -57,7 +57,7 @@ export const useDocumentStore = defineStore('documents', () => {
       sort: DOC_SORT.UPDATED_DESC,
       tag: null,
       page: 1,
-      size: 20,
+      size: 10,
     }
   }
 

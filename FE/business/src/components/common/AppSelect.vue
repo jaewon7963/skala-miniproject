@@ -28,14 +28,21 @@ defineEmits(['update:modelValue'])
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-md);
-  background: var(--c-surface);
-  padding: 0 8px 0 10px;
-  height: 34px;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-full);
+  background: var(--mat-fill);
+  backdrop-filter: blur(var(--mat-blur-sm)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur-sm)) saturate(var(--mat-saturate));
+  box-shadow: var(--shadow-inner-top);
+  transition: background var(--transition);
+}
+.select:hover {
+  background: var(--mat-fill-strong);
 }
 .select--sm {
-  height: 30px;
+  height: 28px;
 }
 .select__label {
   font-size: var(--fs-sm);

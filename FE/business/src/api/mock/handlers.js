@@ -56,9 +56,11 @@ function seedJob(jobId, documentId, { done = false } = {}) {
 seedJob('job-1', 'doc-1', { done: true })
 seedJob('job-3', 'doc-3', { done: true })
 seedJob('job-4', 'doc-4', { done: true })
-// 데모용으로 완료 상태 문서에는 판정이 채워져 있게 둡니다.
+// 데모용 판정 상태
+// job-3 : 검토가 진행되다 만 문서 (앞 4건만 판정 · 나머지는 미판정으로 남겨 화면이 비어 보이지 않게)
+// job-4 : 모든 항목을 판정한 완료 문서
 state.findings['job-3'].forEach((f, i) => {
-  f.verdict = i % 2 === 0 ? VERDICT.ACCEPTED : VERDICT.REJECTED
+  if (i < 4) f.verdict = i % 2 === 0 ? VERDICT.ACCEPTED : VERDICT.REJECTED
 })
 state.findings['job-4'].forEach((f) => (f.verdict = VERDICT.ACCEPTED))
 

@@ -57,8 +57,10 @@ onMounted(() => {
 function selectStatus(status) {
   store.fetchList({ status, tag: null, page: 1 })
 }
+/** 이미 선택된 태그를 다시 누르면 선택을 해제합니다 */
 function selectTag(tag) {
-  store.fetchList({ tag, status: 'ALL', page: 1 })
+  const next = query.value.tag === tag ? null : tag
+  store.fetchList({ tag: next, status: 'ALL', page: 1 })
 }
 
 /** DASH-03 문서 열기 : 분석 이력 유무로 분기 */
@@ -98,8 +100,9 @@ async function submitDelete() {
   <div class="library" @click="menuOpenId = null">
     <!-- 좌측 : 상태 · 태그 -->
     <aside class="side">
-      <p class="side__label">문서</p>
-      <ul class="side__list">
+      <div class="side__scroll u-scroll">
+        <p class="side__label">문서</p>
+        <ul class="side__list">
         <li v-for="tab in statusTabs" :key="tab.key">
           <button
             :class="{ 'is-active': query.status === tab.key && !query.tag }"
@@ -118,14 +121,17 @@ async function submitDelete() {
         <li v-for="tag in tags" :key="tag.id">
           <button
             :class="{ 'is-active': query.tag === tag.id }"
+            :aria-pressed="query.tag === tag.id"
+            :title="query.tag === tag.id ? '태그 선택 해제' : `${tag.name} 태그로 필터`"
             @click="selectTag(tag.id)"
           >
             <span># {{ tag.name }}</span>
             <em>{{ tag.count }}</em>
           </button>
         </li>
-        <li v-if="!tags.length" class="side__empty">태그가 없습니다</li>
-      </ul>
+          <li v-if="!tags.length" class="side__empty">태그가 없습니다</li>
+        </ul>
+      </div>
 
       <!-- 사이드바 하단 : 다크 모드 전환 -->
       <footer class="side__foot">
@@ -140,7 +146,13 @@ async function submitDelete() {
           <h1 class="main__title">{{ currentTitle }}</h1>
           <p class="main__desc">업로드한 사업계획서와 검토 결과를 한 곳에서 관리합니다</p>
         </div>
-        <AppButton @click="router.push({ name: 'upload' })">문서 업로드</AppButton>
+        <AppButton @click="router.push({ name: 'upload' })">
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M8 11V2.6M8 2.6 4.9 5.7M8 2.6l3.1 3.1" />
+            <path d="M2.6 10.4v1.9a1.7 1.7 0 0 0 1.7 1.7h7.4a1.7 1.7 0 0 0 1.7-1.7v-1.9" />
+          </svg>
+          문서 업로드
+        </AppButton>
       </header>
 
       <div class="toolbar">
@@ -241,7 +253,13 @@ async function submitDelete() {
           title="아직 업로드한 문서가 없습니다"
           description="PDF 사업계획서를 올리면 검토를 시작할 수 있습니다"
         >
-          <AppButton @click="router.push({ name: 'upload' })">문서 업로드</AppButton>
+          <AppButton @click="router.push({ name: 'upload' })">
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M8 11V2.6M8 2.6 4.9 5.7M8 2.6l3.1 3.1" />
+            <path d="M2.6 10.4v1.9a1.7 1.7 0 0 0 1.7 1.7h7.4a1.7 1.7 0 0 0 1.7-1.7v-1.9" />
+          </svg>
+          문서 업로드
+        </AppButton>
         </EmptyState>
       </div>
 
@@ -285,26 +303,51 @@ async function submitDelete() {
   align-items: start;
 }
 
+.btn-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* --- 사이드바 --- */
 .side {
   position: sticky;
   top: calc(var(--header-h) + 24px);
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--header-h) - 72px);
-  padding-right: 16px;
-  border-right: 1px solid var(--c-border);
+  /* 목록이 길어져도 사이드바는 화면에 고정됩니다. 내용이 넘치면 사이드바 안에서만 스크롤합니다 */
+  max-height: calc(100vh - var(--header-h) - 48px);
+  overflow: hidden;
+  padding: 10px;
+  border-radius: var(--r-xl);
+  background: var(--mat-sidebar);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  box-shadow: var(--shadow-inner-top);
+}
+.side__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: -2px -4px 0;
+  padding: 2px 4px 0;
 }
 .side__divider {
   height: 1px;
   margin: 4px 8px 14px;
   border: none;
-  background: var(--c-border);
+  background: var(--mat-hairline);
 }
 .side__foot {
   margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid var(--c-border);
+  padding-top: 10px;
+  border-top: 1px solid var(--mat-hairline);
 }
 .side__label {
   font-size: var(--fs-sm);
@@ -322,20 +365,27 @@ async function submitDelete() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 34px;
-  padding: 0 8px;
-  border-radius: var(--r-md);
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
   font-size: var(--fs-md);
   color: var(--c-text-muted);
+  transition:
+    background var(--transition),
+    color var(--transition);
 }
 .side__list button:hover {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
   color: var(--c-text);
 }
 .side__list button.is-active {
-  background: var(--c-primary-50);
-  color: var(--c-primary-700);
-  font-weight: 700;
+  background: var(--c-primary-500);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow-inner-top);
+}
+.side__list button.is-active em {
+  color: rgba(255, 255, 255, 0.75);
 }
 .side__list em {
   font-style: normal;
@@ -380,6 +430,7 @@ async function submitDelete() {
 /* --- 테이블 --- */
 .table-wrap {
   overflow: visible;
+  border-radius: var(--r-xl);
 }
 .table {
   font-size: var(--fs-md);
@@ -389,12 +440,12 @@ async function submitDelete() {
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--c-text-subtle);
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--c-border);
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--mat-hairline);
 }
 .table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--c-border);
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--mat-hairline);
   vertical-align: middle;
 }
 .table tbody tr:last-child td {
@@ -403,8 +454,14 @@ async function submitDelete() {
 .table tbody tr {
   cursor: pointer;
 }
+.table tbody tr {
+  transition: background var(--transition);
+}
 .table tbody tr:hover {
-  background: var(--c-bg-subtle);
+  background: var(--mat-fill);
+}
+.table tbody tr:first-child:hover td:first-child {
+  border-top-left-radius: var(--r-lg);
 }
 .doc__name {
   font-weight: 600;
@@ -448,20 +505,30 @@ async function submitDelete() {
   color: var(--c-text-muted);
 }
 .icon-btn:hover {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
 }
 .menu {
   position: absolute;
   right: 8px;
   top: 34px;
   z-index: 20;
-  min-width: 148px;
-  padding: 4px;
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-md);
+  min-width: 158px;
+  padding: 5px;
+  background: var(--mat-card);
+  backdrop-filter: blur(30px) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(30px) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-inner-top), var(--shadow-lg);
   text-align: left;
+  animation: pop var(--dur-fast) var(--ease-spring);
+  transform-origin: top right;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
 }
 .menu button {
   width: 100%;
@@ -471,7 +538,7 @@ async function submitDelete() {
   font-size: var(--fs-md);
 }
 .menu button:hover:not(:disabled) {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
 }
 .menu button:disabled {
   color: var(--c-text-subtle);

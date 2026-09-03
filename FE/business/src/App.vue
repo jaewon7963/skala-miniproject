@@ -21,7 +21,11 @@ const layout = computed(() => layouts[route.meta.layout] || AppLayout)
 <template>
   <component :is="layout">
     <RouterView v-slot="{ Component }">
-      <transition name="fade" mode="out-in">
+      <!--
+        duration 을 명시하면 transitionend 를 기다리지 않고 타이머로 전환을 끝냅니다.
+        (탭이 백그라운드라 CSS 트랜지션이 진행되지 않을 때 화면이 멈추는 것을 방지)
+      -->
+      <transition name="fade" mode="out-in" :duration="{ enter: 240, leave: 150 }">
         <component :is="Component" />
       </transition>
     </RouterView>

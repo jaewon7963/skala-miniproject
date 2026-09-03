@@ -43,7 +43,9 @@ const activeSectionId = computed(
   flex: none;
   display: flex;
   flex-direction: column;
-  background: var(--c-bg-subtle);
+  background: var(--mat-sidebar);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
 }
 .outline__head {
   height: 40px;
@@ -53,7 +55,7 @@ const activeSectionId = computed(
   font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--c-text-subtle);
-  border-bottom: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--mat-hairline);
 }
 .outline__list {
   flex: 1;
@@ -70,13 +72,18 @@ const activeSectionId = computed(
   align-items: center;
   gap: 6px;
   padding: 7px 8px;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   font-size: var(--fs-md);
   color: var(--c-text-muted);
   text-align: left;
 }
+.outline__list button {
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
 .outline__list button:hover {
-  background: var(--c-surface);
+  background: var(--mat-fill);
   color: var(--c-text);
 }
 .outline__list li.is-level-2 button {
@@ -84,9 +91,10 @@ const activeSectionId = computed(
   font-size: var(--fs-sm);
 }
 .outline__list li.is-active > button {
-  background: var(--c-surface);
+  background: var(--mat-fill-strong);
   color: var(--c-primary-700);
   font-weight: 700;
+  box-shadow: var(--shadow-inner-top);
 }
 .outline__title {
   flex: 1;

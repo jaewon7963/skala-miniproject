@@ -37,28 +37,33 @@ defineEmits(['update:modelValue', 'enter'])
 }
 .field__input {
   width: 100%;
-  height: 42px;
-  padding: 0 12px;
-  border: 1px solid var(--c-border-strong);
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--mat-hairline);
   border-radius: var(--r-md);
-  background: var(--c-surface);
+  background: var(--mat-fill);
   transition:
     border-color var(--transition),
+    background var(--transition),
     box-shadow var(--transition);
 }
 .field__input::placeholder {
   color: var(--c-text-subtle);
 }
+.field__input:hover:not(:disabled):not(:focus) {
+  background: var(--mat-fill-strong);
+}
 .field__input:focus {
   outline: none;
-  border-color: var(--c-primary-500);
+  background: var(--c-surface);
+  border-color: var(--c-primary-400);
   box-shadow: var(--ring);
 }
 .field__input.is-error {
   border-color: var(--c-danger-500);
 }
 .field__input:disabled {
-  background: var(--c-bg-subtle);
   color: var(--c-text-muted);
+  opacity: 0.7;
 }
 </style>

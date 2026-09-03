@@ -22,17 +22,20 @@ import BrandMark from '@/components/common/BrandMark.vue'
   gap: 18px;
   padding: 40px 20px;
   background:
-    radial-gradient(720px 320px at 50% -10%, var(--c-primary-50), transparent 70%),
+    radial-gradient(720px 340px at 50% -8%, var(--c-primary-100), transparent 72%),
+    radial-gradient(520px 300px at 90% 100%, var(--c-danger-50), transparent 70%),
     var(--c-bg);
 }
 .auth__panel {
   width: 100%;
   max-width: 400px;
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
-  padding: 28px 26px 26px;
+  background: var(--mat-card);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-inner-top), var(--shadow-lg);
+  padding: 30px 28px 28px;
 }
 .auth__brand {
   display: inline-flex;
