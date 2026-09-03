@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { FINDING_METHOD_LABEL, VERDICT, VERDICT_LABEL } from '@/constants/enums'
 import { formatPercent } from '@/utils/format'
+import { useReviewStore } from '@/stores/review'
 import AppButton from '@/components/common/AppButton.vue'
 import FindingTypeBadge from '@/components/common/FindingTypeBadge.vue'
 
@@ -15,9 +16,27 @@ const props = defineProps({
   selected: Boolean,
 })
 const emit = defineEmits(['select', 'jump', 'verdict', 'undo'])
+const review = useReviewStore()
+const annotationText = ref('')
 
 const decided = computed(() => props.finding.verdict !== VERDICT.PENDING)
 const decidedLabel = computed(() => VERDICT_LABEL[props.finding.verdict])
+
+function submitVerdict(verdict) {
+  const text = annotationText.value.trim()
+  if (text) {
+    const evidence = props.finding.evidence?.[0]
+    review.addAnnotation({
+      page: evidence?.page ?? props.finding.page,
+      anchorId: evidence?.anchorId ?? null,
+      context: evidence?.label ?? props.finding.title,
+      findingId: props.finding.id,
+      text,
+    })
+  }
+  annotationText.value = ''
+  emit('verdict', verdict)
+}
 </script>
 
 <template>
@@ -45,11 +64,21 @@ const decidedLabel = computed(() => VERDICT_LABEL[props.finding.verdict])
         </li>
       </ul>
 
+      <div class="card__annotation">
+        <label :for="`finding-annotation-${finding.id}`">주석</label>
+        <textarea
+          :id="`finding-annotation-${finding.id}`"
+          v-model="annotationText"
+          rows="3"
+          placeholder="이 검토 항목에 주석을 남겨보세요"
+        />
+      </div>
+
       <div class="card__actions">
-        <AppButton size="sm" variant="secondary" @click="emit('verdict', VERDICT.REJECTED)">
+        <AppButton size="sm" variant="secondary" @click="submitVerdict(VERDICT.REJECTED)">
           오류 아님
         </AppButton>
-        <AppButton size="sm" @click="emit('verdict', VERDICT.ACCEPTED)">검토 반영</AppButton>
+        <AppButton size="sm" @click="submitVerdict(VERDICT.ACCEPTED)">검토 반영</AppButton>
       </div>
     </div>
 
@@ -149,6 +178,37 @@ const decidedLabel = computed(() => VERDICT_LABEL[props.finding.verdict])
 }
 .card__evidence button:hover {
   background: var(--c-primary-100);
+}
+.card__annotation {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--c-border);
+}
+.card__annotation label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--c-text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.card__annotation textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 62px;
+  max-height: 140px;
+  padding: 7px 8px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.card__annotation textarea:focus {
+  border-color: var(--c-primary-500);
+  box-shadow: var(--ring);
+  outline: none;
 }
 .card__actions {
   display: flex;

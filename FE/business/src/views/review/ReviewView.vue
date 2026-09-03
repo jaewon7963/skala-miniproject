@@ -19,9 +19,7 @@ const props = defineProps({ jobId: { type: String, required: true } })
 const router = useRouter()
 const ui = useUiStore()
 const review = useReviewStore()
-const { findings, decidedCount, loading, error, showEvidence, panelWidth } = storeToRefs(review)
-
-const tab = ref('findings')
+const { findings, decidedCount, loading, error, showEvidence, panelWidth, panelTab } = storeToRefs(review)
 const completing = ref(false)
 
 /* ---------------- 사이드바 너비 드래그 ---------------- */
@@ -133,18 +131,18 @@ async function complete() {
 
     <aside class="panel" :style="{ width: `${panelWidth}px` }">
       <div class="panel__content">
-        <FindingList v-if="tab === 'findings'" />
-        <AskPanel v-else-if="tab === 'ask'" />
+        <FindingList v-if="panelTab === 'findings'" />
+        <AskPanel v-else-if="panelTab === 'ask'" />
         <AnnotationList v-else />
       </div>
 
       <nav class="panel__rail" aria-label="검토 패널 전환">
         <button
           type="button"
-          :class="{ 'is-active': tab === 'findings' }"
+          :class="{ 'is-active': panelTab === 'findings' }"
           aria-label="검토 결과"
           title="검토 결과"
-          @click="tab = 'findings'"
+          @click="panelTab = 'findings'"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
@@ -153,10 +151,10 @@ async function complete() {
         </button>
         <button
           type="button"
-          :class="{ 'is-active': tab === 'ask' }"
+          :class="{ 'is-active': panelTab === 'ask' }"
           aria-label="AI 질문"
           title="AI 질문"
-          @click="tab = 'ask'"
+          @click="panelTab = 'ask'"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8.5 9a3.5 3.5 0 1 1 5.8 2.63C13.1 12.6 12 13.2 12 15M12 19h.01" />
@@ -164,10 +162,10 @@ async function complete() {
         </button>
         <button
           type="button"
-          :class="{ 'is-active': tab === 'annotations' }"
+          :class="{ 'is-active': panelTab === 'annotations' }"
           aria-label="주석"
           title="주석"
-          @click="tab = 'annotations'"
+          @click="panelTab = 'annotations'"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4" />

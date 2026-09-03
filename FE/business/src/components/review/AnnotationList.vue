@@ -59,7 +59,7 @@ function remove(annotationId) {
           </span>
           <template v-if="editingId !== annotation.id">
             <strong>{{ annotation.text }}</strong>
-            <q>{{ annotation.selectedText }}</q>
+        <q>{{ annotation.selectedText || annotation.context }}</q>
           </template>
         </button>
 
