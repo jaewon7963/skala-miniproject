@@ -12,7 +12,6 @@ import {
 
 export const mockUser = {
   id: 'u-1',
-  name: '김평가',
   email: 'kim@company.com',
   organization: 'company.com',
   createdAt: '2026-08-01T09:00:00+09:00',

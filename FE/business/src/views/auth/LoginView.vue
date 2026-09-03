@@ -25,7 +25,7 @@ async function submit() {
   formError.value = ''
   try {
     const user = await auth.login({ ...form.value })
-    ui.success(`${user.name}님, 환영합니다`)
+    ui.success(`${user.email} 계정으로 로그인했습니다`)
     router.push(route.query.redirect || { name: 'library' })
   } catch (e) {
     // 실패 시에만 노출되는 상단 안내 (와이어프레임 F-06)

@@ -137,19 +137,14 @@ export const auth = {
     if (password.length < 8) throw new ApiError(401, '이메일 또는 비밀번호를 확인해주세요')
     return { token: 'mock-token', user: { ...state.user, email } }
   },
-  async signup({ name, email }) {
+  async signup({ email }) {
     await delay()
     if (email === 'kim@company.com') throw new ApiError(409, '이미 가입된 이메일입니다')
-    state.user = { ...state.user, name, email }
+    state.user = { ...state.user, email }
     return { token: 'mock-token', user: clone(state.user) }
   },
   async me() {
     await delay(120)
-    return clone(state.user)
-  },
-  async updateProfile({ name }) {
-    await delay()
-    state.user.name = name
     return clone(state.user)
   },
   async changePassword({ currentPassword, newPassword }) {
@@ -355,7 +350,7 @@ export const reviews = {
     return {
       jobId,
       documentName: doc ? `${doc.name} v${doc.version}` : '문서',
-      reviewer: state.user.name,
+      reviewer: state.user.email,
       reviewedAt: new Date().toISOString(),
       verdict: 'CONDITIONAL', // 조건부 보완
       dueDate: '2026-09-12',

@@ -55,13 +55,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function updateProfile(payload) {
-    const next = await authApi.updateProfile(payload)
-    user.value = next
-    localStorage.setItem(USER_KEY, JSON.stringify(next))
-    return next
-  }
-
   const changePassword = (payload) => authApi.changePassword(payload)
 
   async function withdraw(payload) {
@@ -78,7 +71,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     signup,
     logout,
-    updateProfile,
     changePassword,
     withdraw,
     clear,

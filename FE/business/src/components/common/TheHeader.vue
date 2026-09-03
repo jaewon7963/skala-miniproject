@@ -11,7 +11,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const ui = useUiStore()
 
-const initial = computed(() => auth.user?.name?.charAt(0) ?? '·')
+const initial = computed(() => auth.user?.email?.charAt(0)?.toUpperCase() ?? '·')
 /** 라이브러리를 벗어난 화면에서는 되돌아가기 버튼을 보여줍니다. */
 const showBack = computed(() => route.name !== 'library')
 
