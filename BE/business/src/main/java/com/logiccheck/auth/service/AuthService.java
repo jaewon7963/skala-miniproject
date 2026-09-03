@@ -20,8 +20,10 @@ import com.logiccheck.auth.repository.SessionRepository;
 import com.logiccheck.global.exception.BusinessException;
 import com.logiccheck.global.exception.ErrorCode;
 import com.logiccheck.global.security.JwtTokenProvider;
+import com.logiccheck.user.dto.LoginRequest;
 import com.logiccheck.user.dto.SignUpRequest;
 import com.logiccheck.user.entity.User;
+import com.logiccheck.user.entity.UserStatus;
 import com.logiccheck.user.repository.UserRepository;
 
 @Service
@@ -33,6 +35,7 @@ public class AuthService {
     private final SessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final String dummyPasswordHash;
 
     public AuthService(UserRepository userRepository, SessionRepository sessionRepository,
                        PasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider) {
@@ -40,6 +43,7 @@ public class AuthService {
         this.sessionRepository = sessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.dummyPasswordHash = passwordEncoder.encode("dummy-password");
     }
 
     @Transactional
@@ -56,6 +60,17 @@ public class AuthService {
             throw emailAlreadyExists();
         }
 
+        return issueTokens(user);
+    }
+
+    @Transactional
+    public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        String passwordHash = user == null ? dummyPasswordHash : user.getPasswordHash();
+        boolean matches = passwordEncoder.matches(request.password(), passwordHash);
+        if (user == null || !matches || user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
         return issueTokens(user);
     }
 

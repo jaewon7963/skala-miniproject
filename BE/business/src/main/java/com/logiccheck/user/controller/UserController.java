@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.logiccheck.auth.dto.AuthResponse;
 import com.logiccheck.auth.service.AuthService;
+import com.logiccheck.user.dto.LoginRequest;
 import com.logiccheck.user.dto.SignUpRequest;
 
 import jakarta.validation.Valid;
@@ -26,5 +27,10 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse signUp(@Valid @RequestBody SignUpRequest request) {
         return authService.signUp(request);
+    }
+
+    @PostMapping("/login")
+    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+        return authService.login(request);
     }
 }

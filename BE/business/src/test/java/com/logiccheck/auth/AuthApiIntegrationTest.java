@@ -102,4 +102,30 @@ class AuthApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"));
     }
+
+    @Test
+    void logsInAndDoesNotRevealFailureReason() throws Exception {
+        userRepository.save(User.create("login@example.com", passwordEncoder.encode("logic1234")));
+
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"login@example.com\",\"password\":\"logic1234\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.refreshToken").isString())
+                .andExpect(jsonPath("$.user.email").value("login@example.com"));
+
+        String unknownEmail = mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"unknown@example.com\",\"password\":\"logic1234\"}"))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+        String wrongPassword = mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"login@example.com\",\"password\":\"wrong1234\"}"))
+                .andExpect(status().isUnauthorized())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(unknownEmail).isEqualTo(wrongPassword);
+    }
 }
