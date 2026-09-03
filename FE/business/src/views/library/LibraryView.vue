@@ -19,7 +19,7 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 const router = useRouter()
 const ui = useUiStore()
 const store = useDocumentStore()
-const { items, folders, total, counts, loading, query } = storeToRefs(store)
+const { items, tags, total, counts, loading, query } = storeToRefs(store)
 
 const menuOpenId = ref(null)
 const renameTarget = ref(null)
@@ -40,21 +40,25 @@ const statusOptions = [
   ...Object.entries(DOC_STATUS_LABEL).map(([value, label]) => ({ value, label })),
 ]
 
-const isSearching = computed(() => Boolean(query.value.q) || query.value.status !== 'ALL')
-const currentTitle = computed(
-  () => statusTabs.value.find((tab) => tab.key === query.value.status)?.label ?? '전체 문서',
+const isSearching = computed(
+  () => Boolean(query.value.q) || query.value.status !== 'ALL' || Boolean(query.value.tag),
 )
+const tagNames = computed(() => Object.fromEntries(tags.value.map((tag) => [tag.id, tag.name])))
+const currentTitle = computed(() => {
+  if (query.value.tag) return `# ${tagNames.value[query.value.tag] ?? query.value.tag}`
+  return statusTabs.value.find((tab) => tab.key === query.value.status)?.label ?? '전체 문서'
+})
 
 onMounted(() => {
   store.fetchList()
-  store.fetchFolders()
+  store.fetchTags()
 })
 
 function selectStatus(status) {
-  store.fetchList({ status, folderId: null, page: 1 })
+  store.fetchList({ status, tag: null, page: 1 })
 }
-function selectFolder(folderId) {
-  store.fetchList({ folderId, status: 'ALL', page: 1 })
+function selectTag(tag) {
+  store.fetchList({ tag, status: 'ALL', page: 1 })
 }
 
 /** DASH-03 문서 열기 : 분석 이력 유무로 분기 */
@@ -92,13 +96,13 @@ async function submitDelete() {
 
 <template>
   <div class="library" @click="menuOpenId = null">
-    <!-- 좌측 : 상태 · 폴더 -->
+    <!-- 좌측 : 상태 · 태그 -->
     <aside class="side">
       <p class="side__label">문서</p>
       <ul class="side__list">
         <li v-for="tab in statusTabs" :key="tab.key">
           <button
-            :class="{ 'is-active': query.status === tab.key && !query.folderId }"
+            :class="{ 'is-active': query.status === tab.key && !query.tag }"
             @click="selectStatus(tab.key)"
           >
             <span>{{ tab.label }}</span>
@@ -109,18 +113,18 @@ async function submitDelete() {
 
       <hr class="side__divider" />
 
-      <p class="side__label">폴더</p>
+      <p class="side__label">태그</p>
       <ul class="side__list">
-        <li v-for="folder in folders" :key="folder.id">
+        <li v-for="tag in tags" :key="tag.id">
           <button
-            :class="{ 'is-active': query.folderId === folder.id }"
-            @click="selectFolder(folder.id)"
+            :class="{ 'is-active': query.tag === tag.id }"
+            @click="selectTag(tag.id)"
           >
-            <span>{{ folder.name }}</span>
-            <em>{{ folder.count }}</em>
+            <span># {{ tag.name }}</span>
+            <em>{{ tag.count }}</em>
           </button>
         </li>
-        <li v-if="!folders.length" class="side__empty">폴더가 없습니다</li>
+        <li v-if="!tags.length" class="side__empty">태그가 없습니다</li>
       </ul>
 
       <!-- 사이드바 하단 : 다크 모드 전환 -->
@@ -173,6 +177,7 @@ async function submitDelete() {
           <thead>
             <tr>
               <th>문서명</th>
+              <th style="width: 230px">태그</th>
               <th style="width: 110px">상태</th>
               <th style="width: 150px">최근 수정</th>
               <th style="width: 44px"></th>
@@ -185,6 +190,12 @@ async function submitDelete() {
                 <p class="doc__meta">
                   {{ doc.pageCount }}페이지 · {{ formatBytes(doc.sizeBytes) }}
                 </p>
+              </td>
+              <td>
+                <div class="doc__tags">
+                  <span v-for="tag in doc.tags" :key="tag"># {{ tagNames[tag] ?? tag }}</span>
+                  <span v-if="!doc.tags?.length" class="is-empty">태그 없음</span>
+                </div>
               </td>
               <td><StatusBadge :status="doc.status" /></td>
               <td class="doc__date">{{ formatDateTime(doc.updatedAt) }}</td>
@@ -402,6 +413,25 @@ async function submitDelete() {
   font-size: var(--fs-sm);
   color: var(--c-text-subtle);
   margin-top: 2px;
+}
+.doc__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.doc__tags span {
+  padding: 3px 7px;
+  border-radius: var(--r-full);
+  background: var(--c-primary-50);
+  color: var(--c-primary-700);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.doc__tags span.is-empty {
+  background: var(--c-bg-subtle);
+  color: var(--c-text-subtle);
+  font-weight: 400;
 }
 .doc__date {
   color: var(--c-text-muted);

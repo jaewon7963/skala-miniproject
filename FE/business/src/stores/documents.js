@@ -6,7 +6,7 @@ import { DOC_PERIOD, DOC_SORT } from '@/constants/enums'
 /** 라이브러리 목록 상태 (DASH-01 ~ DASH-04) */
 export const useDocumentStore = defineStore('documents', () => {
   const items = ref([])
-  const folders = ref([])
+  const tags = ref([])
   const total = ref(0)
   const counts = ref({})
   const loading = ref(false)
@@ -17,7 +17,7 @@ export const useDocumentStore = defineStore('documents', () => {
     status: 'ALL',
     period: DOC_PERIOD.D30,
     sort: DOC_SORT.UPDATED_DESC,
-    folderId: null,
+    tag: null,
     page: 1,
     size: 20,
   })
@@ -40,11 +40,11 @@ export const useDocumentStore = defineStore('documents', () => {
     }
   }
 
-  async function fetchFolders() {
+  async function fetchTags() {
     try {
-      folders.value = await documentApi.folders()
+      tags.value = await documentApi.tags()
     } catch {
-      folders.value = []
+      tags.value = []
     }
   }
 
@@ -54,7 +54,7 @@ export const useDocumentStore = defineStore('documents', () => {
       status: 'ALL',
       period: DOC_PERIOD.D30,
       sort: DOC_SORT.UPDATED_DESC,
-      folderId: null,
+      tag: null,
       page: 1,
       size: 20,
     }
@@ -72,14 +72,14 @@ export const useDocumentStore = defineStore('documents', () => {
 
   return {
     items,
-    folders,
+    tags,
     total,
     counts,
     loading,
     error,
     query,
     fetchList,
-    fetchFolders,
+    fetchTags,
     resetQuery,
     rename,
     remove,
