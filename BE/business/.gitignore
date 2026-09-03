@@ -38,3 +38,9 @@ out/
 
 ### Document domain runtime uploads ###
 data/
+
+### macOS ###
+.DS_Store
+
+### 로컬 개발용 설정 (시크릿) ###
+src/main/resources/application-local.properties
