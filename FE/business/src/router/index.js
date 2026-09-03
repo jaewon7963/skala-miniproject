@@ -7,8 +7,13 @@ import { useAuthStore } from '@/stores/auth'
  * meta.public : 비로그인 접근 허용
  */
 const routes = [
-  // AUTH-01 : 랜딩 없음. 세션 유무로 분기만 합니다.
-  { path: '/', redirect: () => ({ name: 'library' }) },
+  // 미로그인 방문자의 첫 화면 (AUTH-01 진입점)
+  {
+    path: '/',
+    name: 'welcome',
+    component: () => import('@/views/WelcomeView.vue'),
+    meta: { layout: 'landing', public: true, title: '사업계획서 검토를 시작하세요' },
+  },
 
   {
     path: '/login',
@@ -79,7 +84,10 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior: () => ({ top: 0 }),
+  scrollBehavior: (to, from, saved) => {
+    if (to.hash) return { el: to.hash, behavior: 'smooth', top: 72 }
+    return saved ?? { top: 0 }
+  },
 })
 
 router.beforeEach((to) => {
