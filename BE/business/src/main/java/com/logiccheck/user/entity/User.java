@@ -48,6 +48,19 @@ public class User {
         return new User(email, passwordHash);
     }
 
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    /**
+     * 탈퇴 표시. 데이터를 즉시 지우지 않고 상태만 바꾼다 — 복구 요청과 감사 기록을 위해
+     * 실제 삭제는 유예 기간이 지난 뒤 별도로 처리한다.
+     */
+    public void withdraw() {
+        this.status = UserStatus.WITHDRAWN;
+        this.deletedAt = Instant.now();
+    }
+
     public Long getId() {
         return id;
     }
@@ -66,5 +79,9 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 }

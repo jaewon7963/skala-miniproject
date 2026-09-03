@@ -90,7 +90,9 @@ class DocumentFlowIntegrationTest {
                         .file(new MockMultipartFile("file", "test.pdf", "application/pdf", pdf))
                         .header("Authorization", auth))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.displayStatus").value("PARSE_PENDING"))
+                .andExpect(jsonPath("$.status").value("PARSING"))
+                .andExpect(jsonPath("$.name").value("test"))
+                .andExpect(jsonPath("$.version").value(1))
                 .andExpect(jsonPath("$.pageCount").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
 
@@ -100,11 +102,20 @@ class DocumentFlowIntegrationTest {
 
         mockMvc.perform(get("/api/documents").header("Authorization", auth))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[?(@.id=='" + documentId + "')].displayStatus").value("IDLE"));
+                .andExpect(jsonPath("$.items[?(@.id=='" + documentId + "')].status").value("IDLE"))
+                .andExpect(jsonPath("$.counts.ALL").value(1))
+                .andExpect(jsonPath("$.counts.IDLE").value(1));
+
+        // 화면은 상태 탭이 "전체"일 때도 status=ALL 을 보낸다. 여기서 거절하면 목록이 통째로 빈다.
+        mockMvc.perform(get("/api/documents").param("status", "ALL").param("period", "D30")
+                        .param("sort", "UPDATED_DESC").header("Authorization", auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1));
 
         mockMvc.perform(get("/api/documents/" + documentId).header("Authorization", auth))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mimeType").value("application/pdf"));
+                .andExpect(jsonPath("$.status").value("IDLE"))
+                .andExpect(jsonPath("$.latestJobId").doesNotExist());
 
         mockMvc.perform(get("/api/documents/" + documentId + "/sections").header("Authorization", auth))
                 .andExpect(status().isOk());
@@ -113,12 +124,12 @@ class DocumentFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].pageNo").value(1));
 
-        mockMvc.perform(patch("/api/documents/" + documentId)
+        mockMvc.perform(patch("/api/documents/" + documentId + "/name")
                         .header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"수정된 제목\"}"))
+                        .content("{\"name\":\"수정된 제목\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("수정된 제목"));
+                .andExpect(jsonPath("$.name").value("수정된 제목"));
 
         mockMvc.perform(delete("/api/documents/" + documentId).header("Authorization", auth))
                 .andExpect(status().isNoContent());

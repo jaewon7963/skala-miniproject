@@ -15,7 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.logiccheck.auth.dto.AuthResponse;
+import com.logiccheck.auth.dto.AuthTokenResponse;
 import com.logiccheck.auth.dto.LogoutRequest;
+import com.logiccheck.auth.dto.MeResponse;
+import com.logiccheck.auth.dto.PasswordChangeRequest;
+import com.logiccheck.auth.dto.SignupRequest;
+import com.logiccheck.auth.dto.WithdrawRequest;
 import com.logiccheck.auth.dto.RefreshRequest;
 import com.logiccheck.auth.dto.RefreshResponse;
 import com.logiccheck.auth.entity.Session;
@@ -69,13 +74,98 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        return issueTokens(authenticate(request));
+    }
+
+    /**
+     * 존재하지 않는 이메일이든 비밀번호가 틀렸든 같은 시간이 걸리도록 항상 해시를 비교한다.
+     * 응답 시간 차이로 가입 여부를 알아내지 못하게 하기 위함이다.
+     */
+    private User authenticate(LoginRequest request) {
         User user = userRepository.findByEmail(request.email()).orElse(null);
         String passwordHash = user == null ? dummyPasswordHash : user.getPasswordHash();
         boolean matches = passwordEncoder.matches(request.password(), passwordHash);
         if (user == null || !matches || user.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
-        return issueTokens(user);
+        return user;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 화면이 호출하는 /api/auth/* 경로                                      */
+    /* ------------------------------------------------------------------ */
+
+    @Transactional
+    public AuthTokenResponse signup(SignupRequest request) {
+        if (!request.agreedToAll()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, Map.of("field", "agreeTerms"));
+        }
+        validatePassword(request.password());
+        if (userRepository.existsByEmail(request.email())) {
+            throw emailAlreadyExists();
+        }
+
+        User user;
+        try {
+            user = userRepository.saveAndFlush(User.create(request.email(), passwordEncoder.encode(request.password())));
+        } catch (DataIntegrityViolationException exception) {
+            throw emailAlreadyExists();
+        }
+        return AuthTokenResponse.of(issueAccessToken(user), user);
+    }
+
+    @Transactional
+    public AuthTokenResponse signin(LoginRequest request) {
+        User user = authenticate(request);
+        return AuthTokenResponse.of(issueAccessToken(user), user);
+    }
+
+    @Transactional(readOnly = true)
+    public MeResponse profile(Long userId) {
+        return MeResponse.from(activeUserOrThrow(userId));
+    }
+
+    @Transactional
+    public void changePassword(Long userId, PasswordChangeRequest request) {
+        User user = activeUserOrThrow(userId);
+        verifyPassword(user, request == null ? null : request.currentPassword());
+        validatePassword(request.newPassword());
+        user.changePassword(passwordEncoder.encode(request.newPassword()));
+        // 세션 정리 쿼리가 영속성 컨텍스트를 비우기 때문에, 그 전에 변경을 반영해야
+        // 방금 바꾼 비밀번호가 조용히 사라지지 않는다.
+        userRepository.flush();
+        sessionRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
+    /**
+     * 탈퇴 요청. 즉시 삭제하지 않고 상태만 바꾸고 세션을 끊는다.
+     * 실제 데이터 정리는 유예 기간이 지난 뒤 별도로 처리한다.
+     */
+    @Transactional
+    public void withdraw(Long userId, WithdrawRequest request) {
+        User user = activeUserOrThrow(userId);
+        verifyPassword(user, request == null ? null : request.password());
+        user.withdraw();
+        userRepository.flush();
+        sessionRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
+    private User activeUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .filter(found -> found.getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+    }
+
+    private void verifyPassword(User user, String rawPassword) {
+        if (rawPassword == null || !passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
+    }
+
+    private String issueAccessToken(User user) {
+        sessionRepository.save(Session.create(user, hash(generateRefreshToken()),
+                Instant.now().plus(REFRESH_TOKEN_TTL)));
+        return jwtTokenProvider.createAccessToken(user.getId());
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +215,9 @@ public class AuthService {
     }
 
     private void validatePassword(String password) {
+        if (password == null) {
+            throw new BusinessException(ErrorCode.INVALID_PASSWORD, Map.of("field", "password"));
+        }
         boolean hasLetter = password.chars().anyMatch(Character::isLetter);
         boolean hasDigit = password.chars().anyMatch(Character::isDigit);
         if (password.length() < 8 || !hasLetter || !hasDigit) {

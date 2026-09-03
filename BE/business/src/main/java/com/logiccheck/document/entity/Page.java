@@ -1,6 +1,10 @@
 package com.logiccheck.document.entity;
 
 import java.math.BigDecimal;
+import java.util.List;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -36,6 +40,15 @@ public class Page {
     @Column(name = "text_layer")
     private String textLayer;
 
+    // 원문 뷰어가 쓰는 블록 배열. 텍스트 레이어를 문단/제목/표로 나눈 결과다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "blocks")
+    private List<PageBlock> blocks;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
+    private Section section;
+
     protected Page() {
     }
 
@@ -49,6 +62,11 @@ public class Page {
 
     public static Page of(Document document, int pageNo, BigDecimal width, BigDecimal height, String textLayer) {
         return new Page(document, pageNo, width, height, textLayer);
+    }
+
+    public void attach(List<PageBlock> blocks, Section section) {
+        this.blocks = blocks;
+        this.section = section;
     }
 
     public Long getId() {
@@ -73,5 +91,13 @@ public class Page {
 
     public String getTextLayer() {
         return textLayer;
+    }
+
+    public List<PageBlock> getBlocks() {
+        return blocks;
+    }
+
+    public Section getSection() {
+        return section;
     }
 }

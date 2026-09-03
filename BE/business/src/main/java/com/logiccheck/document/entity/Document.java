@@ -42,6 +42,13 @@ public class Document {
     @Column(name = "page_count")
     private Integer pageCount;
 
+    // 화면 목록에 그대로 노출되는 값들. version은 재분석할 때마다 올린다.
+    @Column(nullable = false)
+    private int version = 1;
+
+    @Column
+    private String summary;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "parse_status", nullable = false, length = 20)
     private ParseStatus parseStatus = ParseStatus.PENDING;
@@ -98,6 +105,18 @@ public class Document {
         this.parseStatus = ParseStatus.DONE;
     }
 
+    public void describe(String summary) {
+        this.summary = summary;
+    }
+
+    public void bumpVersion() {
+        this.version += 1;
+    }
+
+    public void touch() {
+        this.updatedAt = Instant.now();
+    }
+
     public void markFailed() {
         this.parseStatus = ParseStatus.FAILED;
     }
@@ -140,6 +159,14 @@ public class Document {
 
     public Integer getPageCount() {
         return pageCount;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public String getSummary() {
+        return summary;
     }
 
     public ParseStatus getParseStatus() {

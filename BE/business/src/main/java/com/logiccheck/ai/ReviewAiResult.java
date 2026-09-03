@@ -1,0 +1,31 @@
+package com.logiccheck.ai;
+
+import java.util.List;
+
+/** 모델이 돌려주는 분석 결과. */
+public record ReviewAiResult(String modelVersion, String promptVersion, List<AiFinding> findings) {
+
+    /**
+     * 검토 항목 후보 한 건.
+     *
+     * <p>{@code evidence}가 비어 있으면 저장하지 않는다. 어디를 보라는 것인지 못 알려주는
+     * 지적은 화면에서 확인할 방법이 없기 때문이다.
+     */
+    public record AiFinding(
+            String type,
+            String method,
+            Long sectionId,
+            int page,
+            String title,
+            String description,
+            double confidence,
+            AiCalculation calculation,
+            List<AiEvidence> evidence) {
+    }
+
+    public record AiEvidence(String anchorId, int page, String label) {
+    }
+
+    public record AiCalculation(String expression, String expected, String actual, String diff) {
+    }
+}
