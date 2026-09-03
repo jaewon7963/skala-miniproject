@@ -36,6 +36,7 @@ export const useReviewStore = defineStore('review', () => {
   const sections = ref([])
   const pages = ref([])
   const findings = ref([])
+  const annotations = ref([])
   const loading = ref(false)
   const error = ref('')
 
@@ -112,11 +113,13 @@ export const useReviewStore = defineStore('review', () => {
   /** anchorId -> finding (원문 하이라이트 클릭용) */
   const findingByAnchor = computed(() => {
     const map = {}
-    findings.value.forEach((finding) => {
-      finding.evidence?.forEach((evidence) => {
-        map[evidence.anchorId] = finding
+    findings.value
+      .filter((finding) => finding.verdict !== VERDICT.REJECTED)
+      .forEach((finding) => {
+        finding.evidence?.forEach((evidence) => {
+          map[evidence.anchorId] = finding
+        })
       })
-    })
     return map
   })
 
@@ -139,6 +142,11 @@ export const useReviewStore = defineStore('review', () => {
       sections.value = sectionData
       pages.value = pageData
       findings.value = findingData
+      try {
+        annotations.value = JSON.parse(localStorage.getItem(`logiccheck.annotations.${jobId}`) || '[]')
+      } catch {
+        annotations.value = []
+      }
       activeFindingId.value = null
       currentPage.value = findingData[0]?.page ?? 1
     } catch (e) {
@@ -206,6 +214,64 @@ export const useReviewStore = defineStore('review', () => {
     }
   }
 
+  async function addFinding(draft) {
+    if (!job.value) return null
+    const created = await reviewApi.promoteToFinding(job.value.id, draft)
+    findings.value.push(created)
+    activeFindingId.value = created.id
+    return created
+  }
+
+  function persistAnnotations() {
+    if (!job.value) return
+    try {
+      localStorage.setItem(`logiccheck.annotations.${job.value.id}`, JSON.stringify(annotations.value))
+    } catch {
+      /* 저장 실패 시 현재 세션에서는 유지합니다. */
+    }
+  }
+
+  function addAnnotation({ page, anchorId, selectedText, text }) {
+    if (!job.value) return null
+    const annotation = {
+      id: `annotation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      page,
+      anchorId,
+      selectedText,
+      text,
+      createdAt: new Date().toISOString(),
+    }
+    annotations.value.push(annotation)
+    persistAnnotations()
+    return annotation
+  }
+
+  function updateAnnotation(annotationId, text) {
+    const annotation = annotations.value.find((item) => item.id === annotationId)
+    if (!annotation || !text.trim()) return null
+    annotation.text = text.trim()
+    annotation.updatedAt = new Date().toISOString()
+    persistAnnotations()
+    return annotation
+  }
+
+  function removeAnnotation(annotationId) {
+    const index = annotations.value.findIndex((item) => item.id === annotationId)
+    if (index < 0) return false
+    annotations.value.splice(index, 1)
+    persistAnnotations()
+    return true
+  }
+
+  function selectAnnotation(annotationId) {
+    const annotation = annotations.value.find((item) => item.id === annotationId)
+    if (!annotation) return
+    activeFindingId.value = null
+    goToPage(annotation.page)
+    flashAnchorId.value = annotation.anchorId
+    setTimeout(() => (flashAnchorId.value = null), 900)
+  }
+
   const undoVerdict = (findingId) => setVerdict(findingId, VERDICT.PENDING)
 
   async function complete() {
@@ -220,6 +286,7 @@ export const useReviewStore = defineStore('review', () => {
     sections.value = []
     pages.value = []
     findings.value = []
+    annotations.value = []
     activeFindingId.value = null
     filterType.value = 'ALL'
     undecidedOnly.value = false
@@ -231,6 +298,7 @@ export const useReviewStore = defineStore('review', () => {
     sections,
     pages,
     findings,
+    annotations,
     loading,
     error,
     outlineWidth,
@@ -259,6 +327,11 @@ export const useReviewStore = defineStore('review', () => {
     selectFinding,
     selectAnchor,
     toggleTypeFilter,
+    addFinding,
+    addAnnotation,
+    updateAnnotation,
+    removeAnnotation,
+    selectAnnotation,
     setVerdict,
     undoVerdict,
     complete,

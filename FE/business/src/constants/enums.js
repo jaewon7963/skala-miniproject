@@ -67,11 +67,13 @@ export const FINDING_TYPE_ORDER = [
 export const FINDING_METHOD = {
   DETERMINISTIC: 'DETERMINISTIC',
   RAG: 'RAG',
+  MANUAL: 'MANUAL',
 }
 
 export const FINDING_METHOD_LABEL = {
   [FINDING_METHOD.DETERMINISTIC]: '결정적 검산',
   [FINDING_METHOD.RAG]: 'RAG 관계 판단',
+  [FINDING_METHOD.MANUAL]: '사용자 등록',
 }
 
 /* ---------------- 사용자 판정(Verdict) ---------------- */
