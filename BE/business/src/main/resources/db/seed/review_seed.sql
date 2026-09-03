@@ -16,7 +16,9 @@ INSERT INTO validation_rules (code, name, description, expression, tolerance, se
 VALUES ('REVENUE_SUM', '연도별 매출 합계 일치', '본문 합계와 표 소계를 대조한다',
         'sum(yearly_revenue) = total_revenue', 0.01, 'ERROR', 'ruleset-2026.09.01', TRUE, now(), now()),
        ('LABOR_COST', '인건비 산출식 일치', '인원 x 기간 x 월단가 재계산',
-        'headcount * months * monthly_rate = labor_cost', 0.01, 'ERROR', 'ruleset-2026.09.01', TRUE, now(), now())
+        'headcount * months * monthly_rate = labor_cost', 0.01, 'ERROR', 'ruleset-2026.09.01', TRUE, now(), now()),
+       ('NUMERIC_CONSISTENCY', '같은 항목의 수치 일치', '문서 안에서 같은 대상을 가리키는 수치가 서로 다른지 본다',
+        'max(value) - min(value) <= tolerance', 0.01, 'ERROR', 'ruleset-2026.09.01', TRUE, now(), now())
 ON CONFLICT (code, ruleset_version) DO NOTHING;
 
 WITH job AS (SELECT id FROM review_jobs WHERE document_id = 900001),

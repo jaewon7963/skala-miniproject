@@ -4,10 +4,13 @@ import com.logiccheck.document.port.DocumentQueryPort;
 import com.logiccheck.document.port.DocumentQueryPort.DocumentMetaView;
 import com.logiccheck.global.exception.ErrorCode;
 import com.logiccheck.review.job.dto.JobSummaryView;
+import com.logiccheck.review.pipeline.ReviewPipeline;
 import com.logiccheck.review.support.BusinessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ReviewJobService {
@@ -18,13 +21,16 @@ public class ReviewJobService {
     private final ReviewJobRepository reviewJobRepository;
     private final DocumentQueryPort documentQueryPort;
     private final JobFindingSummary jobFindingSummary;
+    private final ReviewPipeline reviewPipeline;
 
     public ReviewJobService(ReviewJobRepository reviewJobRepository,
                             DocumentQueryPort documentQueryPort,
-                            JobFindingSummary jobFindingSummary) {
+                            JobFindingSummary jobFindingSummary,
+                            ReviewPipeline reviewPipeline) {
         this.reviewJobRepository = reviewJobRepository;
         this.documentQueryPort = documentQueryPort;
         this.jobFindingSummary = jobFindingSummary;
+        this.reviewPipeline = reviewPipeline;
     }
 
     /**
@@ -42,14 +48,35 @@ public class ReviewJobService {
             throw new BusinessException(ErrorCode.JOB_ALREADY_RUNNING);
         }
 
+        ReviewJob job;
         try {
             // 애플리케이션 검사만으로는 동시 요청을 막을 수 없다.
             // ux_review_jobs_active 부분 유니크 인덱스가 최종 방어선이므로 즉시 flush 해
             // 제약 위반을 여기서 409 로 변환한다 (DEV3 D-2).
-            return reviewJobRepository.saveAndFlush(ReviewJob.pending(documentId));
+            job = reviewJobRepository.saveAndFlush(ReviewJob.pending(documentId));
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.JOB_ALREADY_RUNNING);
         }
+
+        triggerPipelineAfterCommit(job.getId());
+        return job;
+    }
+
+    /**
+     * 파이프라인은 커밋 이후에 시작해야 한다. 트랜잭션 안에서 던지면
+     * 다른 스레드가 아직 보이지 않는 Job 을 조회해 건너뛴다.
+     */
+    private void triggerPipelineAfterCommit(Long jobId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            reviewPipeline.runAsync(jobId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                reviewPipeline.runAsync(jobId);
+            }
+        });
     }
 
     /** 명세 17. */

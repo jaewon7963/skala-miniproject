@@ -527,3 +527,116 @@ summary 갱신 (decided=3 open=2) 확인
 ```
 
 **MVP1 11개 엔드포인트 구현 완료.** 남은 것은 S5(AI 파이프라인)와 범위 밖인 20번(export, MVP2).
+
+---
+
+## S5a — 검증 규칙 + 결정적 검산 파이프라인
+
+- 2026-09-03
+- 구현 범위: `ValidationRule` · `ruleset_version` 스냅샷 · `@Async` 파이프라인 골격 ·
+  결정적 검산 1종 · 인용문 검증. AI 연동은 S5b.
+
+**추가**
+- `review/rule/ValidationRule.java` · `ValidationRuleRepository.java` · `RulesetVersionResolver.java`
+- `review/pipeline/FindingDraft.java` — 저장 전 검토사항. 결정적 검산과 AI 가 같은 형태로 결과를 낸다
+- `review/pipeline/DeterministicChecker.java` — 검산기 인터페이스 (규칙 코드로 등록)
+- `review/pipeline/NumericConsistencyChecker.java` — 검산기 1종
+- `review/pipeline/QuoteVerifier.java` — 인용문 원문 대조 (D-5)
+- `review/pipeline/ReviewPipeline.java` — `@Async` 오케스트레이션
+- `review/pipeline/ReviewPipelineStore.java` — 트랜잭션 경계
+- `review/finding/FindingElementRepository.java`
+- `review/support/ReviewAsyncConfig.java` (TEMP — 개발자1의 `AsyncConfig` 로 교체)
+- 테스트 24건: `NumericConsistencyCheckerTest`(8) · `QuoteVerifierTest`(8) · `ReviewPipelineTest`(6)
+  + `ReviewJobServiceTest` 2건
+
+**변경**
+- `review/job/ReviewJob.java` — `markRunning(rulesetVersion)` · `markDone()` · `markFailed(errorCode)`
+- `review/job/ReviewJobService.java` — 커밋 후 파이프라인 트리거
+- `review/finding/Finding.java` · `FindingEvidence.java` · `FindingElement.java` — 생성 팩토리
+- `review/support/StubDocumentStructurePort.java` — 표본 데이터 옵션
+- `db/seed/review_seed.sql` — `NUMERIC_CONSISTENCY` 규칙 추가
+
+**결정 · 편차**
+
+1. **파이프라인은 트랜잭션 커밋 후에 시작한다.** `ReviewJobService.start()` 가
+   `TransactionSynchronization.afterCommit` 으로 `runAsync` 를 던진다. 트랜잭션 안에서 던지면
+   파이프라인 스레드가 아직 커밋되지 않은 Job 을 조회해 그냥 건너뛴다.
+
+2. **오케스트레이션은 트랜잭션을 열지 않는다.** 상태 전이와 저장은 `ReviewPipelineStore` 의
+   짧은 트랜잭션으로 나눴다. AI 호출(S5b)이 DB 커넥션을 붙잡지 않게 하기 위함이다.
+
+3. **`startRunning` 은 `PENDING` 인 Job 만 착수한다.** 중복 실행이 들어와도 두 번째는
+   상태 필터에서 걸러진다. `PENDING → RUNNING` 은 같은 행의 UPDATE 라
+   `ux_review_jobs_active` 부분 유니크 인덱스를 위반하지 않는다.
+
+4. **ruleset 버전은 활성 규칙의 최대 버전 문자열로 결정한다.** 버전 이름이 날짜 기반
+   (`ruleset-2026.09.01`)이라 문자열 순서가 시간 순서와 일치한다. 활성 규칙이 없으면
+   `review.ruleset.fallback-version`(기본 `ruleset-empty`)을 쓴다 —
+   Job 의 `ruleset_version` 을 NULL 로 남기지 않는다.
+
+5. **검산기 1종만 구현했다: `NUMERIC_CONSISTENCY`.**
+   같은 대상을 가리키는 수치가 문서 안에서 서로 다른 경우를 지적한다.
+   주제어는 `rawText` 에서 수량 토큰만 걷어내 만든다. **숫자를 통째로 지우면 연도까지 사라져
+   서로 다른 해의 수치가 한 묶음이 되므로**, 시점 표기(년·월·일·분기·주·차)가 붙은 숫자 토큰은
+   주제어로 남긴다. 단위가 다르면 별개 항목으로 본다. 차이가 규칙의 `tolerance` 이하면 지적하지 않는다.
+
+6. **다른 규칙(`REVENUE_SUM` · `LABOR_COST`)은 검산기를 만들지 못했다. ← 개발자2 의존, 팀 확인 필요**
+   `DocumentStructurePort.ElementView(id, pageNo, kind, rawText, numericValue, unit, bbox)` 에는
+   **대상 식별자(label/subject)도 표 구조(행·열)도 없다.** 합계 검산(`sum(parts) = total`)은
+   어느 요소가 부분이고 어느 요소가 합계인지 알아야 하는데 그 정보가 Port 에 없다.
+   `NUMERIC_CONSISTENCY` 는 `rawText` 정규화라는 휴리스틱으로 우회했지만 합계 검산은 우회가 안 된다.
+   → **개발자2와 협의 필요**: `ExtractedElement` 에 대상 식별자(예: `label` 또는 `subject_key`)와
+     표 좌표(`table_id`·`row`·`col`)를 추가할지. 추가되면 `Port ②` 시그니처 변경이므로 팀 합의 사항이다.
+     그때 정규화 휴리스틱도 그 값으로 교체한다.
+
+7. **인용문 검증은 두 갈래다** (D-5 · D-10 §8.10).
+   원문 텍스트(`pages.text_layer`)가 있으면 공백을 무시해 대조하고 불일치하면 폐기한다.
+   원문 텍스트가 없는 페이지(이미지형 표 등)는
+   - 결정적 검산 결과는 **남긴다** — 인용문이 추출 요소의 `rawText` 이므로 원문에서 온 값이다
+   - AI 결과는 **폐기한다** — 검증할 수 없는 AI 응답을 신뢰 데이터처럼 저장하지 않는다
+   근거가 없거나 인용문이 빈 초안은 무조건 폐기한다.
+
+8. **실패 시 `error_code = "PIPELINE_ERROR"`.** ErrorCode enum 에 추가하지 않았다 —
+   이 값은 HTTP 응답 코드가 아니라 `review_jobs.error_code` 컬럼에 남기는 진단 문자열이다.
+
+9. **스텁 구조 Port 에 표본 데이터를 넣었다** (`review.stub.sample-structure=true`).
+   기본은 여전히 빈 리스트다(E-2). 표본의 `rawText` 는 같은 페이지 `textLayer` 안에
+   그대로 들어 있어 인용문 검증까지 통과한다. 개발자2 구현이 오면 이 스텁은 삭제한다.
+
+**검증**
+
+- `./gradlew test` — 99건 통과, 실패 0
+- `ddl-auto=validate` 통과 — `ValidationRule` 매핑이 스키마와 일치
+- 실제 Postgres 대상 E2E (`--review.stub.sample-structure=true`):
+
+  ```
+  POST /api/review-jobs → 202
+    {'id': '23', 'status': 'PENDING', 'rulesetVersion': None,
+     'startedAt': None, 'finishedAt': None, 'summary': None}     ← D-2 대로 전부 null
+
+  폴링 1회 만에 status=DONE terminal=True
+
+  파이프라인 로그:
+    파이프라인 완료. jobId=23 ruleset=ruleset-2026.09.01 요소=3 초안=1 저장=1
+
+  GET /api/review-jobs/23
+    status=DONE · terminal=true · rulesetVersion="ruleset-2026.09.01"
+    startedAt/finishedAt 기록 · summary {total:1, ERROR:1, open:1}
+
+  GET /api/review-jobs/23/findings
+    1건 · severity=ERROR · method=DETERMINISTIC · confidence=0.99
+    calculation {expression, expected:"18억 원", actual:"24억 원", diff:"6억 원"}
+    evidence 2건 — p.9 / p.11, 각각 id·quote·bbox(0~1) 있음
+    quote 는 원문 그대로: "2027년 예상 매출 18억 원" / "2027년 예상 매출 24억 원"
+  ```
+
+- **오탐 없음 확인**: 표본에 `2026년 예상 매출 9.6억 원` 을 섞었지만 지적 대상에서 빠졌다
+  (다른 해는 다른 항목)
+- **`finding_elements` 연결**: `finding_id=26 → element_id 901, 902`
+- **`ruleset_version` 스냅샷**: `review_jobs.ruleset_version = ruleset-2026.09.01`
+- **실패 경로**: 구조 조회가 예외를 던지면 `markFailed(jobId, "PIPELINE_ERROR")`, `markDone` 미호출 (단위 테스트)
+- **중복 실행**: `PENDING` 이 아닌 Job 은 저장·상태 변경 없이 건너뜀 (단위 테스트)
+
+**후속 과제**
+- `REVENUE_SUM` · `LABOR_COST` 검산기 — `ExtractedElement` 스키마 확정 후 (위 6번)
+- S5b: AI 서버 연동 클라이언트 + JSON Schema 검증 + RAG 판단

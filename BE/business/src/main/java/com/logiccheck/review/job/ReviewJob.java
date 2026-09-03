@@ -66,6 +66,29 @@ public class ReviewJob extends BaseTimeEntity {
     }
 
     /**
+     * 파이프라인 착수. 이 시점의 ruleset 버전을 스냅샷으로 남긴다 (DEV3 D-9).
+     * PENDING → RUNNING 은 같은 행의 UPDATE 라 ux_review_jobs_active 를 위반하지 않는다.
+     */
+    public void markRunning(String rulesetVersion) {
+        this.status = JobStatus.RUNNING;
+        this.rulesetVersion = rulesetVersion;
+        this.startedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        this.errorCode = null;
+    }
+
+    public void markDone() {
+        this.status = JobStatus.DONE;
+        this.finishedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    /** 실패 시 status = FAILED 와 error_code 를 남긴다 (DEV3 D-10). */
+    public void markFailed(String errorCode) {
+        this.status = JobStatus.FAILED;
+        this.errorCode = errorCode;
+        this.finishedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    /**
      * 명세 19. review_status 와 completed_at 만 바꾼다.
      * status 와 parse_status 는 건드리지 않는다 — 두 상태는 서로 독립이다 (DEV3 D-1 · D-8).
      */

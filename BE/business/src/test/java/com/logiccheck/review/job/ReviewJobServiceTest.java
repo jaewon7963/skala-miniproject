@@ -30,6 +30,7 @@ class ReviewJobServiceTest {
     private String parseStatus;
     private boolean owned;
     private ReviewJobService service;
+    private com.logiccheck.review.pipeline.ReviewPipeline pipeline;
 
     @BeforeEach
     void setUp() {
@@ -40,7 +41,8 @@ class ReviewJobServiceTest {
         DocumentQueryPort port = (documentId, userId) -> owned
                 ? Optional.of(new DocumentMetaView(documentId, userId, "스텁 문서", 21, parseStatus))
                 : Optional.empty();
-        service = new ReviewJobService(repository, port, jobId -> SUMMARY);
+        pipeline = mock(com.logiccheck.review.pipeline.ReviewPipeline.class);
+        service = new ReviewJobService(repository, port, jobId -> SUMMARY, pipeline);
 
         when(repository.existsByDocumentIdAndStatusIn(anyLong(), any())).thenReturn(false);
         when(repository.saveAndFlush(any(ReviewJob.class)))
@@ -54,6 +56,21 @@ class ReviewJobServiceTest {
         assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
         assertThat(job.getReviewStatus()).isEqualTo(ReviewStatus.IN_REVIEW);
         assertThat(job.getDocumentId()).isEqualTo(1L);
+    }
+
+    @Test
+    void 분석을_시작하면_파이프라인이_트리거된다() {
+        ReviewJob job = service.start(1L, 7L);
+
+        org.mockito.Mockito.verify(pipeline).runAsync(job.getId());
+    }
+
+    @Test
+    void 선행_조건_위반이면_파이프라인을_트리거하지_않는다() {
+        parseStatus = "PARSING";
+
+        assertThatErrorCode(() -> service.start(1L, 7L), ErrorCode.DOCUMENT_NOT_READY);
+        org.mockito.Mockito.verify(pipeline, org.mockito.Mockito.never()).runAsync(anyLong());
     }
 
     @Test

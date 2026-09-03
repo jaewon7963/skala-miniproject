@@ -91,6 +91,40 @@ public class Finding extends BaseTimeEntity {
     protected Finding() {
     }
 
+    private Finding(ReviewJob job, Long ruleId, Severity severity, String title, String description,
+                    BigDecimal confidence, Integer pageNo, Long sectionId) {
+        this.job = job;
+        this.ruleId = ruleId;
+        this.severity = severity;
+        this.status = FindingStatus.OPEN;
+        this.title = title;
+        this.description = description;
+        this.confidence = confidence;
+        this.pageNo = pageNo;
+        this.sectionId = sectionId;
+    }
+
+    public static Finding open(ReviewJob job, Long ruleId, Severity severity, String title,
+                               String description, BigDecimal confidence,
+                               Integer pageNo, Long sectionId) {
+        return new Finding(job, ruleId, severity, title, description, confidence, pageNo, sectionId);
+    }
+
+    /** calculation 은 DETERMINISTIC(rule_id 존재)일 때만 채운다 (DEV3 D-4). */
+    public void applyCalculation(String expression, String expected, String actual, String diff) {
+        if (ruleId == null) {
+            return;
+        }
+        this.calcExpression = expression;
+        this.calcExpected = expected;
+        this.calcActual = actual;
+        this.calcDiff = diff;
+    }
+
+    public void addEvidence(FindingEvidence item) {
+        this.evidence.add(item);
+    }
+
     /**
      * 명세 23. status 를 바꾸고 decided_at 을 기록한다.
      * 이력은 finding_decisions 에 별도로 누적한다 — 이 메서드만 부르면 안 된다 (DEV3 D-6).

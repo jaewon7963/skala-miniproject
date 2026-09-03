@@ -65,6 +65,32 @@ public class FindingEvidence extends BaseTimeEntity {
     protected FindingEvidence() {
     }
 
+    private FindingEvidence(Finding finding, Integer pageNo, String quote, String label,
+                            BigDecimal bboxX, BigDecimal bboxY, BigDecimal bboxW, BigDecimal bboxH,
+                            Integer charStart, Integer charEnd, Integer ordering) {
+        this.finding = finding;
+        this.pageNo = pageNo;
+        this.quote = quote;
+        this.label = label;
+        this.bboxX = bboxX;
+        this.bboxY = bboxY;
+        this.bboxW = bboxW;
+        this.bboxH = bboxH;
+        this.charStart = charStart;
+        this.charEnd = charEnd;
+        this.ordering = ordering;
+    }
+
+    /** bbox 는 네 값이 모두 있을 때만 저장한다 — DB CHECK 제약과 같은 규칙이다. */
+    public static FindingEvidence of(Finding finding, Integer pageNo, String quote, String label,
+                                     BigDecimal x, BigDecimal y, BigDecimal w, BigDecimal h,
+                                     Integer charStart, Integer charEnd, int ordering) {
+        boolean fullBbox = x != null && y != null && w != null && h != null;
+        return new FindingEvidence(finding, pageNo, quote, label,
+                fullBbox ? x : null, fullBbox ? y : null, fullBbox ? w : null, fullBbox ? h : null,
+                charStart, charEnd, ordering);
+    }
+
     /** bbox 네 값이 모두 있을 때만 좌표를 내려보낸다. */
     public boolean hasBbox() {
         return bboxX != null && bboxY != null && bboxW != null && bboxH != null;

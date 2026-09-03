@@ -37,6 +37,16 @@ public class FindingElement extends BaseTimeEntity {
     protected FindingElement() {
     }
 
+    private FindingElement(Finding finding, Long elementId, String role) {
+        this.finding = finding;
+        this.elementId = elementId;
+        this.role = role;
+    }
+
+    public static FindingElement of(Finding finding, Long elementId, String role) {
+        return new FindingElement(finding, elementId, role);
+    }
+
     public Long getId() {
         return id;
     }
