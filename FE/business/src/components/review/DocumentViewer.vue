@@ -1,9 +1,9 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useReviewStore } from '@/stores/review'
-import { FINDING_TYPE } from '@/constants/enums'
-import FindingTypeBadge from '@/components/common/FindingTypeBadge.vue'
+import { useUiStore } from '@/stores/ui'
+import { FINDING_METHOD, FINDING_TYPE, FINDING_TYPE_LABEL } from '@/constants/enums'
 
 /**
  * REV-03 원문 뷰어 / REV-06 양방향 앵커
@@ -11,6 +11,7 @@ import FindingTypeBadge from '@/components/common/FindingTypeBadge.vue'
  * (블록 id ↔ finding.evidence[].anchorId 매핑 규칙은 그대로 유지)
  */
 const review = useReviewStore()
+const ui = useUiStore()
 const { currentPage, currentPageData, pages, zoom, showEvidence, findingByAnchor, flashAnchorId, activeFindingId } =
   storeToRefs(review)
 
@@ -21,6 +22,20 @@ const toneMap = {
 }
 
 const totalPages = computed(() => pages.value.length || 1)
+const viewerScroll = ref(null)
+const selection = ref(null)
+const optionsOpen = ref(false)
+const adding = ref(false)
+const annotationText = ref('')
+
+const typeOptions = [FINDING_TYPE.ERROR, FINDING_TYPE.NEEDS_CHECK, FINDING_TYPE.NO_EVIDENCE]
+
+watch(flashAnchorId, async (anchorId) => {
+  if (!anchorId) return
+  await nextTick()
+  const target = viewerScroll.value?.querySelector(`[data-block-id="${CSS.escape(anchorId)}"]`)
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+})
 
 function findingOf(blockId) {
   return showEvidence.value ? findingByAnchor.value[blockId] : null
@@ -28,8 +43,142 @@ function findingOf(blockId) {
 function toneOf(blockId) {
   const finding = findingOf(blockId)
   if (!finding) return null
+  if (selectedEvidenceOf(finding, blockId)?.selectedText) return null
   return toneMap[finding.type]
 }
+
+function selectedEvidenceOf(finding, blockId) {
+  return finding?.evidence?.find((item) => item.anchorId === blockId)
+}
+
+function textSegments(block) {
+  const finding = findingOf(block.id)
+  const ranges = []
+  const findingText = selectedEvidenceOf(finding, block.id)?.selectedText
+  if (findingText) {
+    const start = block.text.indexOf(findingText)
+    if (start >= 0) {
+      ranges.push({
+        start,
+        end: start + findingText.length,
+        kind: 'finding',
+        tone: toneMap[finding.type],
+      })
+    }
+  }
+
+  review.annotations.forEach((annotation, index) => {
+    if (annotation.anchorId !== block.id || !annotation.selectedText) return
+    const start = block.text.indexOf(annotation.selectedText)
+    if (start >= 0) {
+      ranges.push({
+        start,
+        end: start + annotation.selectedText.length,
+        kind: 'annotation',
+        annotationId: annotation.id,
+        annotationIndex: index + 1,
+      })
+    }
+  })
+
+  if (!ranges.length) return [{ text: block.text, kind: 'plain' }]
+  ranges.sort((left, right) => left.start - right.start || left.end - right.end)
+
+  const parts = []
+  let cursor = 0
+  ranges.forEach((range) => {
+    if (range.start < cursor) return
+    if (range.start > cursor) parts.push({ text: block.text.slice(cursor, range.start), kind: 'plain' })
+    parts.push({ ...range, text: block.text.slice(range.start, range.end) })
+    cursor = range.end
+  })
+  if (cursor < block.text.length) parts.push({ text: block.text.slice(cursor), kind: 'plain' })
+  return parts
+}
+
+function clearSelection() {
+  selection.value = null
+  optionsOpen.value = false
+  annotationText.value = ''
+  window.getSelection()?.removeAllRanges()
+}
+
+function captureSelection(event) {
+  if (event.target.closest('.selection-action')) return
+  const browserSelection = window.getSelection()
+  const text = browserSelection?.toString().trim()
+  if (!text || browserSelection.rangeCount === 0) return clearSelection()
+
+  const range = browserSelection.getRangeAt(0)
+  const startElement = range.startContainer.nodeType === Node.TEXT_NODE
+    ? range.startContainer.parentElement
+    : range.startContainer
+  const endElement = range.endContainer.nodeType === Node.TEXT_NODE
+    ? range.endContainer.parentElement
+    : range.endContainer
+  const startBlock = startElement?.closest?.('[data-selectable-block]')
+  const endBlock = endElement?.closest?.('[data-selectable-block]')
+  if (!startBlock || startBlock !== endBlock) return clearSelection()
+
+  const rect = range.getBoundingClientRect()
+  selection.value = {
+    text,
+    blockId: startBlock.dataset.blockId,
+    left: Math.min(rect.right + 6, window.innerWidth - 44),
+    top: Math.min(rect.bottom + 6, window.innerHeight - 44),
+  }
+  optionsOpen.value = false
+}
+
+function saveAnnotation() {
+  const text = annotationText.value.trim()
+  if (!selection.value || !text) return
+  review.addAnnotation({
+    page: currentPage.value,
+    anchorId: selection.value.blockId,
+    selectedText: selection.value.text,
+    text,
+  })
+  ui.success('주석을 저장했습니다')
+  clearSelection()
+}
+
+async function addSelectionAsFinding(type) {
+  if (!selection.value || adding.value) return
+  adding.value = true
+  const selected = selection.value
+  const section = [...review.sections].reverse().find((item) => currentPage.value >= item.page)
+  const shortText = selected.text.length > 36 ? `${selected.text.slice(0, 36)}…` : selected.text
+  try {
+    await review.addFinding({
+      type,
+      page: currentPage.value,
+      sectionId: section?.id ?? null,
+      title: `${FINDING_TYPE_LABEL[type]}: ${shortText}`,
+      description: `사용자가 원문에서 직접 선택한 검토 항목입니다: “${selected.text}”`,
+      confidence: 1,
+      method: FINDING_METHOD.MANUAL,
+      evidence: [{
+        anchorId: selected.blockId,
+        page: currentPage.value,
+        label: selected.text,
+        selectedText: selected.text,
+      }],
+    })
+    ui.success(`${FINDING_TYPE_LABEL[type]} 검토 항목으로 추가했습니다`)
+    clearSelection()
+  } catch (error) {
+    ui.error(error.message)
+  } finally {
+    adding.value = false
+  }
+}
+
+function closeOnEscape(event) {
+  if (event.key === 'Escape') clearSelection()
+}
+window.addEventListener('keydown', closeOnEscape)
+onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 </script>
 
 <template>
@@ -56,10 +205,11 @@ function toneOf(blockId) {
     </header>
 
     <!-- 지면 -->
-    <div class="viewer__scroll u-scroll">
+    <div ref="viewerScroll" class="viewer__scroll u-scroll">
       <article
         class="paper"
         :style="{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }"
+        @mouseup="captureSelection"
       >
         <span class="paper__page">{{ currentPage }} / {{ totalPages }}</span>
 
@@ -71,17 +221,35 @@ function toneOf(blockId) {
           <p
             v-else-if="block.kind === 'p'"
             class="paper__p"
+            data-selectable-block
+            :data-block-id="block.id"
             :class="[
               toneOf(block.id) ? `hl hl--${toneOf(block.id)}` : '',
               { 'is-flash': flashAnchorId === block.id, 'is-active': findingOf(block.id)?.id === activeFindingId },
             ]"
             @click="findingOf(block.id) && review.selectAnchor(block.id)"
           >
-            {{ block.text }}
-            <span v-if="findingOf(block.id)" class="mini">
-              <FindingTypeBadge :type="findingOf(block.id).type" size="sm" />
-              {{ findingOf(block.id).title }}
-            </span>
+            <template v-for="(part, index) in textSegments(block)" :key="index">
+              <mark
+                v-if="part.kind === 'finding'"
+                class="selection-mark"
+                :class="[
+                  `hl--${part.tone}`,
+                  { 'is-flash': flashAnchorId === block.id },
+                ]"
+              >
+                {{ part.text }}
+              </mark>
+              <mark
+                v-else-if="part.kind === 'annotation'"
+                class="annotation-mark"
+                :class="{ 'is-flash': flashAnchorId === block.id }"
+                @click.stop="review.selectAnnotation(part.annotationId)"
+              >
+                {{ part.text }}<sup>{{ part.annotationIndex }}</sup>
+              </mark>
+              <template v-else>{{ part.text }}</template>
+            </template>
           </p>
 
           <!-- 표 -->
@@ -121,6 +289,52 @@ function toneOf(blockId) {
         </template>
       </article>
     </div>
+
+    <div
+      v-if="selection"
+      class="selection-action"
+      :style="{ left: `${selection.left}px`, top: `${selection.top}px` }"
+    >
+      <button
+        class="selection-action__trigger"
+        type="button"
+        aria-label="선택한 텍스트를 검토 항목으로 추가"
+        title="검토 항목 추가"
+        @click="optionsOpen = !optionsOpen"
+      >
+        ＋
+      </button>
+      <div v-if="optionsOpen" class="selection-action__menu">
+        <div class="selection-action__annotation">
+          <label for="selection-annotation">주석</label>
+          <textarea
+            id="selection-annotation"
+            v-model="annotationText"
+            rows="3"
+            placeholder="선택한 문구에 주석을 남겨보세요"
+            @keydown.stop
+          />
+          <button
+            type="button"
+            :disabled="!annotationText.trim()"
+            @click="saveAnnotation"
+          >
+            주석 저장
+          </button>
+        </div>
+        <p>검토 항목으로 추가</p>
+        <button
+          v-for="type in typeOptions"
+          :key="type"
+          type="button"
+          :disabled="adding"
+          :class="`is-${toneMap[type]}`"
+          @click="addSelectionAsFinding(type)"
+        >
+          <i />{{ FINDING_TYPE_LABEL[type] }}
+        </button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -132,6 +346,143 @@ function toneOf(blockId) {
   flex-direction: column;
   background: var(--c-bg-subtle);
 }
+.selection-mark {
+  cursor: pointer;
+  padding: 1px 0;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+.annotation-mark {
+  position: relative;
+  cursor: pointer;
+  padding: 1px 0;
+  border-radius: 2px;
+  background: var(--c-primary-50);
+  color: inherit;
+  box-shadow: inset 0 -2px 0 var(--c-primary-400);
+}
+.annotation-mark sup {
+  display: inline-grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  padding: 0 3px;
+  border-radius: var(--r-full);
+  background: var(--c-primary-600);
+  color: var(--c-white);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: super;
+}
+.selection-action {
+  position: fixed;
+  z-index: 50;
+}
+.selection-action__trigger {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--c-inverse-bg);
+  color: var(--c-inverse-fg);
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: var(--shadow-md);
+}
+.selection-action__trigger:hover {
+  background: var(--c-primary-600);
+}
+.selection-action__menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  width: 220px;
+  padding: 7px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-lg);
+}
+.selection-action__annotation {
+  padding: 3px 3px 8px;
+  border-bottom: 1px solid var(--c-border);
+  margin-bottom: 4px;
+}
+.selection-action__annotation label {
+  display: block;
+  margin: 1px 4px 5px;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.selection-action__annotation textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 58px;
+  max-height: 120px;
+  padding: 7px 8px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.selection-action__annotation textarea:focus {
+  border-color: var(--c-primary-500);
+  box-shadow: var(--ring);
+  outline: none;
+}
+.selection-action__annotation button {
+  justify-content: center;
+  margin-top: 5px;
+  background: var(--c-primary-500);
+  color: var(--c-white);
+  font-weight: 700;
+}
+.selection-action__annotation button:hover {
+  background: var(--c-primary-600);
+  color: var(--c-white);
+}
+.selection-action__annotation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.selection-action__menu p {
+  padding: 4px 7px 7px;
+  color: var(--c-text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.selection-action__menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border-radius: var(--r-sm);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+.selection-action__menu button:hover {
+  background: var(--c-surface-hover);
+  color: var(--c-text);
+}
+.selection-action__menu i {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+.selection-action__menu .is-error { color: var(--c-finding-error); }
+.selection-action__menu .is-check { color: var(--c-finding-check); }
+.selection-action__menu .is-evidence { color: var(--c-finding-evidence); }
 .toolbar {
   height: 40px;
   display: flex;
@@ -264,7 +615,9 @@ function toneOf(blockId) {
   outline: 2px solid currentColor;
   outline-offset: 1px;
 }
-.hl.is-flash {
+.hl.is-flash,
+.selection-mark.is-flash,
+.annotation-mark.is-flash {
   animation: flash 0.85s ease;
 }
 @keyframes flash {
@@ -277,25 +630,4 @@ function toneOf(blockId) {
   }
 }
 
-/* 하이라이트 호버 미니 카드 */
-.mini {
-  display: none;
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 6px);
-  z-index: 10;
-  max-width: 320px;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 9px;
-  border-radius: var(--r-md);
-  background: var(--c-inverse-bg);
-  color: var(--c-inverse-fg);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  box-shadow: var(--shadow-md);
-}
-.hl:hover .mini {
-  display: flex;
-}
 </style>

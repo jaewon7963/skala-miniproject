@@ -11,6 +11,7 @@ import DocumentViewer from '@/components/review/DocumentViewer.vue'
 import FindingList from '@/components/review/FindingList.vue'
 import SectionOutline from '@/components/review/SectionOutline.vue'
 import AskPanel from '@/components/review/AskPanel.vue'
+import AnnotationList from '@/components/review/AnnotationList.vue'
 
 /** REV-01 검토 화면 (3분할) · SHR-01 검토 완료 */
 const props = defineProps({ jobId: { type: String, required: true } })
@@ -61,7 +62,7 @@ onMounted(async () => {
   await review.load(props.jobId)
   if (review.job?.documentId) {
     const doc = await documentApi.get(review.job.documentId)
-    documentTitle.value = `${doc.name} v${doc.version}`
+    documentTitle.value = doc.name
   }
 })
 onUnmounted(() => {
@@ -131,15 +132,48 @@ async function complete() {
     />
 
     <aside class="panel" :style="{ width: `${panelWidth}px` }">
-      <div class="panel__tabs">
-        <button :class="{ 'is-active': tab === 'findings' }" @click="tab = 'findings'">
-          검토 결과 <em>{{ findings.length }}</em>
-        </button>
-        <button :class="{ 'is-active': tab === 'ask' }" @click="tab = 'ask'">AI 질문</button>
+      <div class="panel__content">
+        <FindingList v-if="tab === 'findings'" />
+        <AskPanel v-else-if="tab === 'ask'" />
+        <AnnotationList v-else />
       </div>
 
-      <FindingList v-if="tab === 'findings'" />
-      <AskPanel v-else />
+      <nav class="panel__rail" aria-label="검토 패널 전환">
+        <button
+          type="button"
+          :class="{ 'is-active': tab === 'findings' }"
+          aria-label="검토 결과"
+          title="검토 결과"
+          @click="tab = 'findings'"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+          </svg>
+          <span v-if="findings.length" class="panel__count">{{ findings.length }}</span>
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-active': tab === 'ask' }"
+          aria-label="AI 질문"
+          title="AI 질문"
+          @click="tab = 'ask'"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.5 9a3.5 3.5 0 1 1 5.8 2.63C13.1 12.6 12 13.2 12 15M12 19h.01" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-active': tab === 'annotations' }"
+          aria-label="주석"
+          title="주석"
+          @click="tab = 'annotations'"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4" />
+          </svg>
+        </button>
+      </nav>
     </aside>
   </div>
 
@@ -199,29 +233,65 @@ async function complete() {
 .panel {
   flex: none;
   display: flex;
-  flex-direction: column;
   background: var(--c-surface);
 }
-.panel__tabs {
-  display: flex;
-  border-bottom: 1px solid var(--c-border);
-}
-.panel__tabs button {
+.panel__content {
   flex: 1;
-  height: 40px;
-  font-size: var(--fs-md);
-  font-weight: 600;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.panel__rail {
+  width: 48px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border-left: 1px solid var(--c-border);
+  background: var(--c-bg-subtle);
+}
+.panel__rail button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
   color: var(--c-text-muted);
-  border-bottom: 2px solid transparent;
 }
-.panel__tabs button.is-active {
+.panel__rail button:hover {
+  background: var(--c-surface-hover);
+  color: var(--c-text);
+}
+.panel__rail button.is-active {
+  background: var(--c-primary-50);
   color: var(--c-primary-700);
-  border-bottom-color: var(--c-primary-500);
 }
-.panel__tabs em {
-  font-style: normal;
-  font-size: var(--fs-sm);
-  color: var(--c-text-subtle);
+.panel__rail svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.panel__count {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+  border-radius: var(--r-full);
+  background: var(--c-primary-500);
+  color: var(--c-white);
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .resizer {
