@@ -119,10 +119,6 @@ public class Finding {
         evidence.add(FindingEvidence.of(this, anchorId, pageNo, label, selectedText, evidence.size()));
     }
 
-    public boolean hasEvidence() {
-        return !evidence.isEmpty();
-    }
-
     public void decide(Verdict verdict) {
         this.verdict = verdict;
         this.decidedAt = verdict == Verdict.PENDING ? null : Instant.now();
@@ -130,10 +126,6 @@ public class Finding {
 
     public Long getId() {
         return id;
-    }
-
-    public Long getJobId() {
-        return jobId;
     }
 
     public FindingType getFindingType() {

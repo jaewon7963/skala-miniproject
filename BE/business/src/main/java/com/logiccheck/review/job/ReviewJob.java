@@ -196,14 +196,6 @@ public class ReviewJob {
         return partialFailures == null ? List.of() : partialFailures;
     }
 
-    public Instant getStartedAt() {
-        return startedAt;
-    }
-
-    public Instant getFinishedAt() {
-        return finishedAt;
-    }
-
     public Instant getCompletedAt() {
         return completedAt;
     }
