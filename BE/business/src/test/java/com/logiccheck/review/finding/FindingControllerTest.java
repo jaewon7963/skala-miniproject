@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -29,9 +30,13 @@ class FindingControllerTest {
     @BeforeEach
     void setUp() {
         service = mock(FindingService.class);
+        org.springframework.validation.beanvalidation.LocalValidatorFactoryBean validator =
+                new org.springframework.validation.beanvalidation.LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new FindingController(service))
                 .setCustomArgumentResolvers(new CurrentUserArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setValidator(validator)
                 .build();
     }
 
@@ -112,6 +117,59 @@ class FindingControllerTest {
         mockMvc.perform(get("/api/findings/999").header("X-User-Id", "7"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void 판정은_201_과_갱신된_Finding_을_반환한다() throws Exception {
+        ReviewJob job = FindingFixtures.job(42L, JobStatus.DONE);
+        Finding accepted = FindingFixtures.deterministic(1, job, Severity.ERROR, "0.960");
+        accepted.decide(DecisionAction.ACCEPT);
+        when(service.decide(1L, 7L, DecisionAction.ACCEPT, null, null)).thenReturn(accepted);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/findings/1/decisions")
+                        .header("X-User-Id", "7")
+                        .contentType("application/json")
+                        .content("{\"action\":\"ACCEPT\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("1"))
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
+    }
+
+    @Test
+    void action_이_없으면_400_이다() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/findings/1/decisions")
+                        .header("X-User-Id", "7")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void 지원하지_않는_action_은_400_이다() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/findings/1/decisions")
+                        .header("X-User-Id", "7")
+                        .contentType("application/json")
+                        .content("{\"action\":\"HOLD\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void 완료된_Job_의_Finding_판정은_409_다() throws Exception {
+        when(service.decide(anyLong(), anyLong(), any(), any(), any()))
+                .thenThrow(new BusinessException(ErrorCode.JOB_ALREADY_COMPLETED));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/findings/1/decisions")
+                        .header("X-User-Id", "7")
+                        .contentType("application/json")
+                        .content("{\"action\":\"ACCEPT\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("JOB_ALREADY_COMPLETED"));
     }
 
     @Test

@@ -443,3 +443,87 @@ curl -H 'X-User-Id: 1' http://localhost:8081/api/review-jobs/1
 
 **후속 과제**
 - 검토 완료 후 주석 잠금 여부 (위 9번)
+
+---
+
+## S4b — 판정: API 23 (미결 #5 통합 채택)
+
+- 2026-09-03
+- 구현 범위: 검토사항 판정(23). `annotationBody` 를 함께 받으면 판정과 주석을 한 트랜잭션에서 저장한다.
+
+**추가**
+- `review/finding/DecisionAction.java` — `ACCEPT → ACCEPTED` · `REJECT → REJECTED`
+- `review/finding/FindingDecision.java` · `FindingDecisionRepository.java`
+- `review/finding/dto/CreateDecisionRequest.java`
+- 테스트 13건 추가 (`FindingServiceTest` 9 · `FindingControllerTest` 4)
+
+**변경**
+- `review/finding/Finding.java` — `decide(DecisionAction)` 추가
+- `review/finding/FindingService.java` — `decide()` 추가, `requireOwnedFinding()` 로 소유권 검사 통합
+- `review/finding/FindingController.java` — 23번 엔드포인트 추가
+
+**결정 · 편차**
+
+1. **요청 필드는 `action` 이다** (`ACCEPT` · `REJECT`). 구 명세의 `verdict: "ACCEPTED"` 가 아니라
+   D-6 의 전이 라벨(`OPEN ──ACCEPT──▶ ACCEPTED`)과 `finding_decisions.action` CHECK 제약에 맞췄다.
+   `HOLD` 같은 미지원 값은 400 이다.
+
+2. **응답은 갱신된 Finding** (`FindingResponse`) 이다. 201 이지만 `Location` 헤더를 붙이지 않았다 —
+   판정 이력 조회 API 가 보류라서 가리킬 리소스가 없다.
+   **주의:** `annotationBody` 로 만든 주석의 id 는 이 응답에 없다. 필요하면 FE 가 24번을 다시 부르거나
+   25번을 따로 쓴다. 응답을 `{finding, annotation}` 복합 객체로 만드는 것은 A-3 위반 소지가 있어 피했다.
+   **← 팀 확인 필요**
+
+3. **재판정을 허용한다.** D-6 이 "`review_status = COMPLETED` 인 Job 의 Finding 은 판정을
+   변경할 수 없다" 고 못 박은 것은, 완료되지 않은 Job 에서는 변경이 가능하다는 뜻으로 읽었다.
+   `finding_decisions` 에 이력이 누적되므로 변경 경로가 추적된다.
+   **되돌리기(OPEN 복귀) API 는 만들지 않았다** — FE 의 `undoVerdict` 는 비활성화된다.
+
+4. **`actor_id` 는 JWT 사용자로 고정.** 요청에 `actorId` 를 넣어 보내도 무시된다 — 확인함.
+
+5. **`annotationBody` 처리는 `AnnotationService.createForFinding` 에 위임하고
+   `Propagation.MANDATORY` 를 걸었다.** 트랜잭션 없이는 호출 자체가 실패하므로,
+   판정만 커밋되고 주석이 따로 새는 상황이 구조적으로 불가능하다.
+   좌표는 해당 Finding 의 첫 evidence 를 복사한다.
+
+6. **`decided_at` 은 판정 시 기록하지만 응답에 넣지 않았다** (S0 6번과 동일한 이유).
+
+**검증**
+
+- `./gradlew test` — 75건 통과 (Job 27 · Finding 28 · Annotation 20), 실패 0
+- `ddl-auto=validate` 통과 — `FindingDecision` 매핑이 스키마와 일치
+- 실제 Postgres 대상 curl:
+
+  | 요청 | 결과 |
+  |---|---|
+  | `POST /api/findings/{id}/decisions` `{"action":"ACCEPT"}` | `201` · `status: ACCEPTED` |
+  | `{"action":"REJECT","note":...,"annotationBody":...}` | `201` · `status: REJECTED` |
+  | `finding_decisions` | 2행. `actor_id=1`, `before_status=OPEN`, `after_status=ACCEPTED/REJECTED`, `note` 저장 |
+  | `annotations` (annotationBody 로 생성) | 1행. `finding_id=17`, `author_id=1`, `page_no=14`, `bbox_x=0.12` — 첫 evidence 복사 확인 |
+  | 재판정 | `201`, 해당 Finding 의 이력 2건 |
+  | `{"action":"HOLD"}` | `400 INVALID_REQUEST` |
+  | `{}` | `400` · `details.action` |
+  | `actorId: "999"` 주입 | 무시. `actor_id` = 인증 주체(5) |
+  | 완료된 Job 의 Finding 판정 | `409 JOB_ALREADY_COMPLETED` |
+
+- **17번 summary 연동**: 판정 3건 후 `{"total":5,"decided":3,"open":2,...}` — `decided + open == total` 성립
+
+**H절 E2E 최소 시퀀스 전체 통과**
+
+```
+분석 시작                       202
+Job 조회 (terminal=true)        200
+findings 목록                   200
+finding 상세                    200
+판정                            201
+summary 갱신 (decided=3 open=2) 확인
+주석 생성                       201
+주석 목록                       200
+주석 수정                       200
+주석 삭제                       204
+검토 완료                       200
+판정 재시도                     409
+완료 후 DB: status=DONE(불변) · review_status=COMPLETED
+```
+
+**MVP1 11개 엔드포인트 구현 완료.** 남은 것은 S5(AI 파이프라인)와 범위 밖인 20번(export, MVP2).

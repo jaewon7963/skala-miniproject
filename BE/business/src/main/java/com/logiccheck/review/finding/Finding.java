@@ -19,6 +19,7 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -88,6 +89,15 @@ public class Finding extends BaseTimeEntity {
     private List<FindingEvidence> evidence = new ArrayList<>();
 
     protected Finding() {
+    }
+
+    /**
+     * 명세 23. status 를 바꾸고 decided_at 을 기록한다.
+     * 이력은 finding_decisions 에 별도로 누적한다 — 이 메서드만 부르면 안 된다 (DEV3 D-6).
+     */
+    public void decide(DecisionAction action) {
+        this.status = action.resultStatus();
+        this.decidedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     public FindingMethod method() {
