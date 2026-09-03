@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,11 +20,6 @@ import com.logiccheck.document.repository.SectionRepository;
 // PARSING/EXTRACTING 중간 상태가 실제로 보인다 (하나의 큰 트랜잭션이면 끝날 때까지 안 보임).
 @Component
 public class DocumentParseStatusUpdater {
-
-    /** "2.1 목표 시장 규모"처럼 소수점이 있으면 하위 목차로 본다. */
-    private static final Pattern SUB_HEADING = Pattern.compile("^\\d+\\.\\d+.*");
-    private static final int MAX_DERIVED_SECTIONS = 40;
-    private static final int SUMMARY_MAX_LENGTH = 120;
 
     private final DocumentRepository documentRepository;
     private final PageRepository pageRepository;
@@ -59,16 +53,8 @@ public class DocumentParseStatusUpdater {
             blocksByPage.put(p.pageNo(), blockExtractor.extract(p.pageNo(), p.text()));
         }
 
-        // PDF 북마크가 있으면 그대로 쓰고, 없으면(대부분의 사업계획서가 그렇다) 페이지별 제목 블록에서 만든다.
-        List<ParsedDocument.ParsedSection> outline = parsed.sections().isEmpty()
-                ? deriveSections(blocksByPage)
-                : parsed.sections();
-
-        List<Section> sections = new ArrayList<>();
-        for (ParsedDocument.ParsedSection s : outline) {
-            sections.add(sectionRepository.save(Section.of(document, null, Section.Source.ORIGINAL, s.title(),
-                    s.level(), s.pageFrom(), null, s.orderNo())));
-        }
+        DocumentOutline.Result outline = DocumentOutline.build(parsed.sections(), blocksByPage);
+        List<Section> sections = save(document, outline);
 
         for (ParsedDocument.ParsedPage p : parsed.pages()) {
             Page page = pageRepository.save(Page.of(document, p.pageNo(), p.width(), p.height(), p.text()));
@@ -76,7 +62,7 @@ public class DocumentParseStatusUpdater {
         }
 
         document.completeParsing(parsed.pageCount());
-        document.describe(summarize(blocksByPage));
+        document.describe(DocumentOutline.summarize(blocksByPage));
     }
 
     @Transactional
@@ -84,20 +70,15 @@ public class DocumentParseStatusUpdater {
         documentRepository.findById(documentId).ifPresent(Document::markFailed);
     }
 
-    /** 페이지마다 첫 제목 블록 하나씩만 목차로 올린다. 페이지 수만큼 항목이 늘어나는 것을 막는다. */
-    private List<ParsedDocument.ParsedSection> deriveSections(Map<Integer, List<PageBlock>> blocksByPage) {
-        List<ParsedDocument.ParsedSection> sections = new ArrayList<>();
-        for (Map.Entry<Integer, List<PageBlock>> entry : blocksByPage.entrySet()) {
-            if (sections.size() >= MAX_DERIVED_SECTIONS) {
-                break;
-            }
-            entry.getValue().stream()
-                    .filter(block -> "h2".equals(block.kind()))
-                    .findFirst()
-                    .ifPresent(block -> sections.add(new ParsedDocument.ParsedSection(block.text(),
-                            SUB_HEADING.matcher(block.text()).matches() ? 2 : 1, entry.getKey(), sections.size())));
+    /** 목차를 순서대로 저장하면서 계층을 잇는다. 부모는 이미 저장된 앞쪽 항목이라 인덱스로 찾는다. */
+    private List<Section> save(Document document, DocumentOutline.Result outline) {
+        List<Section> saved = new ArrayList<>();
+        for (DocumentOutline.Entry entry : outline.entries()) {
+            Section parent = entry.hasParent() ? saved.get(entry.parentIndex()) : null;
+            saved.add(sectionRepository.save(Section.of(document, parent, outline.source(), entry.title(),
+                    entry.level(), entry.pageFrom(), null, entry.orderNo())));
         }
-        return sections;
+        return saved;
     }
 
     /** 페이지가 속한 섹션 = 시작 페이지가 그 페이지 이하인 마지막 섹션. */
@@ -109,15 +90,5 @@ public class DocumentParseStatusUpdater {
             }
         }
         return current;
-    }
-
-    private String summarize(Map<Integer, List<PageBlock>> blocksByPage) {
-        String first = blocksByPage.values().stream()
-                .flatMap(List::stream)
-                .filter(block -> "p".equals(block.kind()) && block.text() != null && block.text().length() > 10)
-                .map(PageBlock::text)
-                .findFirst()
-                .orElse("업로드 완료 · 분석 대기");
-        return first.length() <= SUMMARY_MAX_LENGTH ? first : first.substring(0, SUMMARY_MAX_LENGTH) + "…";
     }
 }

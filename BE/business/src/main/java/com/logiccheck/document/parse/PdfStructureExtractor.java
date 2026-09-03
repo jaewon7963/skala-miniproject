@@ -24,6 +24,15 @@ public class PdfStructureExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(PdfStructureExtractor.class);
 
+    /**
+     * 북마크를 몇 단계까지 목차로 삼을지.
+     *
+     * <p>발표자료를 PDF로 내보내면 텍스트 상자 하나하나가 북마크가 되어, 28쪽 문서에서
+     * 373개가 나온 적이 있다. 한 문장이 두 항목으로 쪼개지기까지 했다.
+     * 화면 목차도 두 단계까지만 들여쓰기를 갖고 있어 그 아래는 구분이 되지 않는다.
+     */
+    private static final int MAX_OUTLINE_LEVEL = 2;
+
     public ParsedDocument extract(Path file) throws IOException {
         try (PDDocument document = Loader.loadPDF(file.toFile())) {
             List<ParsedDocument.ParsedPage> pages = extractPages(document);
@@ -60,9 +69,16 @@ public class PdfStructureExtractor {
 
     private void walk(PDDocument document, PDOutlineNode node, int level, List<ParsedDocument.ParsedSection> out,
                        int[] ordering) {
+        if (level > MAX_OUTLINE_LEVEL) {
+            return;
+        }
         for (PDOutlineItem item = node.getFirstChild(); item != null; item = item.getNextSibling()) {
+            String title = item.getTitle();
+            if (title == null || title.isBlank()) {
+                continue;
+            }
             Integer pageFrom = resolvePageNo(document, item);
-            out.add(new ParsedDocument.ParsedSection(item.getTitle(), level, pageFrom, ordering[0]++));
+            out.add(new ParsedDocument.ParsedSection(title.strip(), level, pageFrom, ordering[0]++));
             walk(document, item, level + 1, out, ordering);
         }
     }
