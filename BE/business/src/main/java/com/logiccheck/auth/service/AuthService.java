@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.logiccheck.auth.dto.AuthResponse;
+import com.logiccheck.auth.dto.LogoutRequest;
 import com.logiccheck.auth.dto.RefreshRequest;
 import com.logiccheck.auth.dto.RefreshResponse;
 import com.logiccheck.auth.entity.Session;
@@ -97,6 +98,21 @@ public class AuthService {
         session.rotate(hash(refreshToken), now.plus(REFRESH_TOKEN_TTL));
         String accessToken = jwtTokenProvider.createAccessToken(session.getUser().getId());
         return new RefreshResponse(accessToken, refreshToken);
+    }
+
+    @Transactional
+    public void logout(Long userId, LogoutRequest request) {
+        Instant now = Instant.now();
+        if (request == null || request.refreshToken() == null) {
+            sessionRepository.revokeAllByUserId(userId, now);
+            return;
+        }
+        if (request.refreshToken().isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, Map.of("field", "refreshToken"));
+        }
+        sessionRepository.findByRefreshTokenHashAndUserId(hash(request.refreshToken()), userId)
+                .filter(session -> session.getRevokedAt() == null)
+                .ifPresent(session -> session.revoke(now));
     }
 
     private AuthResponse issueTokens(User user) {

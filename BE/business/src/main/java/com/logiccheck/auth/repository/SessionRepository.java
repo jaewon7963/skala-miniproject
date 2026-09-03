@@ -15,7 +15,7 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 
     Optional<Session> findByRefreshTokenHashAndUserId(String refreshTokenHash, Long userId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("update Session s set s.revokedAt = :now where s.user.id = :userId and s.revokedAt is null")
     int revokeAllByUserId(@Param("userId") Long userId, @Param("now") Instant now);
 }

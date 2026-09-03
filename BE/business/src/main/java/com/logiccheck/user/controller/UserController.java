@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.logiccheck.auth.dto.AuthResponse;
+import com.logiccheck.auth.dto.LogoutRequest;
 import com.logiccheck.auth.dto.RefreshRequest;
 import com.logiccheck.auth.dto.RefreshResponse;
 import com.logiccheck.auth.service.AuthService;
@@ -47,5 +48,11 @@ public class UserController {
     @PostMapping("/refresh")
     public RefreshResponse refresh(@Valid @RequestBody RefreshRequest request) {
         return authService.refresh(request);
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@CurrentUser Long userId, @RequestBody(required = false) LogoutRequest request) {
+        authService.logout(userId, request);
     }
 }

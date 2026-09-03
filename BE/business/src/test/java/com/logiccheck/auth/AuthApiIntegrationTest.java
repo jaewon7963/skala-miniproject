@@ -178,4 +178,67 @@ class AuthApiIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
     }
+
+    @Test
+    void logsOutOneSessionAndBlocksRefresh() throws Exception {
+        String signup = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"logout@example.com\",\"password\":\"logic1234\"}"))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode tokens = objectMapper.readTree(signup);
+
+        mockMvc.perform(post("/api/users/logout")
+                        .header("Authorization", "Bearer " + tokens.get("accessToken").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + tokens.get("refreshToken").asText() + "\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/users/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + tokens.get("refreshToken").asText() + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
+
+    @Test
+    void logoutWithoutBodyRevokesAllUserSessions() throws Exception {
+        String signup = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"all@example.com\",\"password\":\"logic1234\"}"))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode tokens = objectMapper.readTree(signup);
+        mockMvc.perform(post("/api/users/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"all@example.com\",\"password\":\"logic1234\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/users/logout")
+                        .header("Authorization", "Bearer " + tokens.get("accessToken").asText()))
+                .andExpect(status().isNoContent());
+
+        assertThat(sessionRepository.findAll()).allMatch(session -> session.getRevokedAt() != null);
+    }
+
+    @Test
+    void cannotRevokeAnotherUsersSession() throws Exception {
+        JsonNode first = objectMapper.readTree(mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"first@example.com\",\"password\":\"logic1234\"}"))
+                .andReturn().getResponse().getContentAsString());
+        JsonNode second = objectMapper.readTree(mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"second@example.com\",\"password\":\"logic1234\"}"))
+                .andReturn().getResponse().getContentAsString());
+
+        mockMvc.perform(post("/api/users/logout")
+                        .header("Authorization", "Bearer " + first.get("accessToken").asText())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + second.get("refreshToken").asText() + "\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/users/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + second.get("refreshToken").asText() + "\"}"))
+                .andExpect(status().isOk());
+    }
 }
