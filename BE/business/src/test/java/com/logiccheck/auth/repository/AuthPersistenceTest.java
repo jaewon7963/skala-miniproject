@@ -52,4 +52,15 @@ class AuthPersistenceTest {
         assertThat(sessionRepository.findByRefreshTokenHash("new-hash")).contains(session);
         assertThat(session.isActiveAt(Instant.now())).isTrue();
     }
+
+    @Test
+    void rejectsExpiredAndRevokedSession() {
+        User user = userRepository.save(User.create("expired@example.com", "bcrypt-hash"));
+        Session expired = Session.create(user, "expired-hash", Instant.now().minusSeconds(1));
+        Session revoked = Session.create(user, "revoked-hash", Instant.now().plusSeconds(60));
+        revoked.revoke(Instant.now());
+
+        assertThat(expired.isActiveAt(Instant.now())).isFalse();
+        assertThat(revoked.isActiveAt(Instant.now())).isFalse();
+    }
 }

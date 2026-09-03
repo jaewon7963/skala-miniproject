@@ -150,4 +150,32 @@ class AuthApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.details").isEmpty());
     }
+
+    @Test
+    void rotatesRefreshTokenAndRejectsThePreviousToken() throws Exception {
+        String signup = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"refresh@example.com\",\"password\":\"logic1234\"}"))
+                .andReturn().getResponse().getContentAsString();
+        String oldRefreshToken = objectMapper.readTree(signup).get("refreshToken").asText();
+
+        String refreshed = mockMvc.perform(post("/api/users/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + oldRefreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.refreshToken").isString())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(objectMapper.readTree(refreshed).get("refreshToken").asText()).isNotEqualTo(oldRefreshToken);
+        assertThat(sessionRepository.findAll().get(0).getExpiresAt())
+                .isBetween(java.time.Instant.now().plus(java.time.Duration.ofDays(13)),
+                        java.time.Instant.now().plus(java.time.Duration.ofDays(15)));
+
+        mockMvc.perform(post("/api/users/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + oldRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    }
 }

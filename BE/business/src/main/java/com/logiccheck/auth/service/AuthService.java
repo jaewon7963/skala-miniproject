@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.logiccheck.auth.dto.AuthResponse;
+import com.logiccheck.auth.dto.RefreshRequest;
+import com.logiccheck.auth.dto.RefreshResponse;
 import com.logiccheck.auth.entity.Session;
 import com.logiccheck.auth.repository.SessionRepository;
 import com.logiccheck.global.exception.BusinessException;
@@ -81,6 +83,20 @@ public class AuthService {
                 .filter(found -> found.getStatus() == UserStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
         return UserResponse.from(user);
+    }
+
+    @Transactional
+    public RefreshResponse refresh(RefreshRequest request) {
+        Instant now = Instant.now();
+        Session session = sessionRepository.findByRefreshTokenHash(hash(request.refreshToken()))
+                .filter(found -> found.isActiveAt(now))
+                .filter(found -> found.getUser().getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        String refreshToken = generateRefreshToken();
+        session.rotate(hash(refreshToken), now.plus(REFRESH_TOKEN_TTL));
+        String accessToken = jwtTokenProvider.createAccessToken(session.getUser().getId());
+        return new RefreshResponse(accessToken, refreshToken);
     }
 
     private AuthResponse issueTokens(User user) {

@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.logiccheck.auth.dto.AuthResponse;
+import com.logiccheck.auth.dto.RefreshRequest;
+import com.logiccheck.auth.dto.RefreshResponse;
 import com.logiccheck.auth.service.AuthService;
 import com.logiccheck.global.security.CurrentUser;
 import com.logiccheck.user.dto.LoginRequest;
@@ -40,5 +42,10 @@ public class UserController {
     @GetMapping("/me")
     public UserResponse me(@CurrentUser Long userId) {
         return authService.me(userId);
+    }
+
+    @PostMapping("/refresh")
+    public RefreshResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        return authService.refresh(request);
     }
 }
