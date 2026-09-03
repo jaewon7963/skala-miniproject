@@ -16,14 +16,15 @@ defineProps({
   width: 100%;
   height: 6px;
   border-radius: var(--r-full);
-  background: var(--c-border);
+  background: var(--mat-fill-strong);
+  box-shadow: inset 0 1px 2px rgba(28, 25, 23, 0.08);
   overflow: hidden;
 }
 .bar__fill {
   display: block;
   height: 100%;
   border-radius: var(--r-full);
-  transition: width 240ms ease;
+  transition: width var(--dur) var(--ease-out);
 }
 .bar__fill--primary {
   background: var(--c-primary-500);

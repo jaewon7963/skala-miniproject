@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { documentApi, reviewApi } from '@/api'
-import { applyNames } from '@/utils/documentNames'
+import { applyName, applyNames } from '@/utils/documentNames'
 import { useUiStore } from '@/stores/ui'
 import { DOC_STATUS, UPLOAD_LIMIT } from '@/constants/enums'
 import { formatBytes } from '@/utils/format'
@@ -31,9 +31,14 @@ const acceptLabel = computed(
 onMounted(async () => {
   const { items } = await documentApi.list({ size: 5 })
   recent.value = applyNames(items)
-  // 라이브러리에서 '미분석 문서 열기'로 들어온 경우
-  if (route.query.documentId) {
-    uploaded.value = items.find((d) => d.id === route.query.documentId) ?? null
+
+  // 라이브러리에서 '미분석 문서 열기'로 들어온 경우 — 최근 목록에 없을 수 있어 직접 조회합니다
+  const { documentId } = route.query
+  if (!documentId) return
+  try {
+    uploaded.value = applyName(await documentApi.get(documentId))
+  } catch {
+    ui.error('문서를 찾을 수 없습니다')
   }
 })
 
@@ -183,10 +188,12 @@ async function startAnalysis() {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 48px 24px;
-  border: 1.5px dashed var(--c-border-strong);
-  border-radius: var(--r-lg);
-  background: var(--c-bg-subtle);
+  padding: 52px 24px;
+  border: 1.5px dashed var(--mat-hairline-strong);
+  border-radius: var(--r-2xl);
+  background: var(--mat-fill);
+  backdrop-filter: blur(var(--mat-blur-sm)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur-sm)) saturate(var(--mat-saturate));
   cursor: pointer;
   transition:
     border-color var(--transition),
@@ -299,7 +306,7 @@ async function startAnalysis() {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--mat-hairline);
   font-size: var(--fs-md);
 }
 .recent__list li:last-child {

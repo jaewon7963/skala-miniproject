@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { FINDING_METHOD_LABEL, VERDICT, VERDICT_LABEL } from '@/constants/enums'
+import { FINDING_METHOD_LABEL, FINDING_TYPE, VERDICT, VERDICT_LABEL } from '@/constants/enums'
 import { formatPercent } from '@/utils/format'
 import { useReviewStore } from '@/stores/review'
 import AppButton from '@/components/common/AppButton.vue'
@@ -20,6 +20,16 @@ const review = useReviewStore()
 const annotationText = ref('')
 
 const decided = computed(() => props.finding.verdict !== VERDICT.PENDING)
+
+/** 미판정 항목은 유형별 테두리 색을 씁니다 (오류=빨강 · 확인 필요=주황 · 근거 부족=파랑) */
+const toneClass = computed(
+  () =>
+    ({
+      [FINDING_TYPE.ERROR]: 'tone-error',
+      [FINDING_TYPE.NEEDS_CHECK]: 'tone-check',
+      [FINDING_TYPE.NO_EVIDENCE]: 'tone-evidence',
+    })[props.finding.type] ?? '',
+)
 const decidedLabel = computed(() => VERDICT_LABEL[props.finding.verdict])
 
 function submitVerdict(verdict) {
@@ -42,7 +52,7 @@ function submitVerdict(verdict) {
 <template>
   <article
     class="card"
-    :class="{ 'is-selected': selected, 'is-decided': decided }"
+    :class="[decided ? 'is-decided' : toneClass, { 'is-selected': selected }]"
     @click="emit('select')"
   >
     <header class="card__head">
@@ -108,17 +118,30 @@ function submitVerdict(verdict) {
 .card:hover {
   border-color: var(--c-border-strong);
 }
-.card.is-selected {
-  border-color: var(--c-primary-500);
-  border-width: 2px;
-  padding: 11px;
-  box-shadow: var(--shadow-sm);
+/* 미판정 : 위험도별 테두리 */
+.card.tone-error {
+  border-color: var(--c-finding-error);
 }
+.card.tone-check {
+  border-color: var(--c-finding-check);
+}
+.card.tone-evidence {
+  border-color: var(--c-finding-evidence);
+}
+
+/* 판정 완료 : 배경은 그대로 두고 옅은 초록 테두리만 */
 .card.is-decided {
-  background: var(--c-bg-subtle);
+  border-color: var(--c-success-border);
 }
 .card.is-decided .card__title {
   color: var(--c-text-muted);
+}
+
+/* 선택 : 두께만 키워 강조 (색은 유형 · 판정 상태를 유지) */
+.card.is-selected {
+  border-width: 2px;
+  padding: 11px;
+  box-shadow: var(--shadow-sm);
 }
 
 .card__head {

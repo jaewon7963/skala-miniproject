@@ -91,9 +91,10 @@ const navLinks = [
     border-color var(--transition);
 }
 .nav.is-scrolled {
-  background: var(--c-surface-blur);
-  backdrop-filter: blur(10px);
-  border-bottom-color: var(--c-border);
+  background: var(--mat-chrome);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  border-bottom-color: var(--mat-hairline);
 }
 .nav__inner {
   height: 60px;
@@ -130,7 +131,7 @@ const navLinks = [
   align-items: center;
   gap: 14px;
   padding: 44px 24px 52px;
-  border-top: 1px solid var(--c-border);
+  border-top: 1px solid var(--mat-hairline);
   text-align: center;
 }
 .foot__links {

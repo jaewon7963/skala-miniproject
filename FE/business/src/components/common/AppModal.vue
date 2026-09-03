@@ -9,7 +9,7 @@ const emit = defineEmits(['close'])
 
 <template>
   <Teleport to="body">
-    <transition name="fade">
+    <transition name="sheet">
       <div v-if="open" class="backdrop" @click.self="emit('close')">
         <section class="modal" :style="{ width }" role="dialog" aria-modal="true">
           <header class="modal__head">
@@ -28,7 +28,9 @@ const emit = defineEmits(['close'])
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(28, 25, 23, 0.32);
+  background: var(--mat-scrim);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -36,9 +38,12 @@ const emit = defineEmits(['close'])
   z-index: 60;
 }
 .modal {
-  background: var(--c-surface);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
+  background: var(--mat-card);
+  backdrop-filter: blur(30px) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(30px) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-inner-top), var(--shadow-lg);
   max-width: 100%;
   max-height: 90vh;
   display: flex;
@@ -48,25 +53,57 @@ const emit = defineEmits(['close'])
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px 8px;
+  padding: 20px 22px 8px;
 }
 .modal__head h2 {
   font-size: var(--fs-lg);
+  letter-spacing: var(--ls-tight);
 }
 .modal__close {
-  font-size: 20px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mat-fill);
   color: var(--c-text-muted);
+  font-size: 17px;
   line-height: 1;
+  transition: background var(--transition);
+}
+.modal__close:hover {
+  background: var(--mat-fill-strong);
+  color: var(--c-text);
 }
 .modal__body {
-  padding: 8px 20px 18px;
+  padding: 8px 22px 20px;
   overflow-y: auto;
 }
 .modal__foot {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--c-border);
+  padding: 14px 22px;
+  border-top: 1px solid var(--mat-hairline);
+}
+
+/* 시트 전환 */
+.sheet-enter-active {
+  transition:
+    opacity var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-spring);
+}
+.sheet-leave-active {
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.sheet-enter-from,
+.sheet-leave-to {
+  opacity: 0;
+}
+.sheet-enter-from .modal {
+  transform: scale(0.94) translateY(10px);
+}
+.sheet-leave-to .modal {
+  transform: scale(0.98);
 }
 </style>

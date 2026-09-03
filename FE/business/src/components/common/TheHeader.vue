@@ -46,9 +46,10 @@ async function logout() {
   top: 0;
   z-index: 30;
   height: var(--header-h);
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-surface-blur);
-  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--mat-hairline);
+  background: var(--mat-chrome);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
 }
 .header__inner {
   height: 100%;
@@ -68,15 +69,22 @@ async function logout() {
   color: var(--c-primary-600);
 }
 .header__avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--c-primary-50);
   color: var(--c-primary-700);
   font-weight: 700;
   font-size: var(--fs-sm);
+  box-shadow: var(--shadow-inner-top);
+  transition:
+    background var(--transition),
+    transform var(--dur-fast) var(--ease-spring);
 }
 .header__avatar:hover {
   background: var(--c-primary-100);
+}
+.header__avatar:active {
+  transform: scale(0.94);
 }
 </style>

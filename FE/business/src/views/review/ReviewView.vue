@@ -20,7 +20,8 @@ const props = defineProps({ jobId: { type: String, required: true } })
 const router = useRouter()
 const ui = useUiStore()
 const review = useReviewStore()
-const { findings, decidedCount, loading, error, showEvidence, panelWidth, panelTab } = storeToRefs(review)
+const { findings, decidedCount, loading, error, showEvidence, panelWidth, panelTab } =
+  storeToRefs(review)
 const completing = ref(false)
 
 /* ---------------- 사이드바 너비 드래그 ---------------- */
@@ -83,104 +84,113 @@ async function complete() {
 </script>
 
 <template>
-  <!-- 상단 바 -->
-  <header class="bar">
-    <RouterLink class="bar__back" :to="{ name: 'library' }">← 라이브러리</RouterLink>
-    <BrandMark compact />
-    <span class="bar__title">{{ documentTitle }}</span>
+  <!-- 단일 루트 : <Transition> 이 애니메이션할 수 있도록 감쌉니다 -->
+  <div class="review">
+    <!-- 상단 바 -->
+    <header class="bar">
+      <RouterLink class="bar__back" :to="{ name: 'library' }">← 라이브러리</RouterLink>
+      <BrandMark compact />
+      <span class="bar__title">{{ documentTitle }}</span>
 
-    <span class="u-spacer" />
+      <span class="u-spacer" />
 
-    <!-- REV-03 원문 근거 표시 (좌측 사이드바에서 상단 바로 이동) -->
-    <label class="bar__toggle">
-      <input v-model="showEvidence" type="checkbox" />
-      원문 근거 표시
-    </label>
-    <span class="bar__divider" aria-hidden="true" />
+      <!-- REV-03 원문 근거 표시 (좌측 사이드바에서 상단 바로 이동) -->
+      <label class="bar__toggle">
+        <input v-model="showEvidence" type="checkbox" />
+        원문 근거 표시
+      </label>
+      <span class="bar__divider" aria-hidden="true" />
 
-    <span class="bar__progress">판정 {{ decidedCount }} / {{ findings.length }}</span>
-    <!-- SHR-02 공유는 보류. 자리만 유지합니다. -->
-    <AppButton size="sm" variant="ghost" disabled>공유</AppButton>
-    <AppButton size="sm" :loading="completing" @click="complete">검토 완료</AppButton>
-  </header>
+      <span class="bar__progress">판정 {{ decidedCount }} / {{ findings.length }}</span>
+      <!-- SHR-02 공유는 보류. 자리만 유지합니다. -->
+      <AppButton size="sm" variant="ghost" disabled>공유</AppButton>
+      <AppButton size="sm" :loading="completing" @click="complete">검토 완료</AppButton>
+    </header>
 
-  <!-- 3분할 본문 -->
-  <div class="body">
-    <SectionOutline />
+    <!-- 3분할 본문 -->
+    <div class="body">
+      <SectionOutline />
 
-    <div
-      class="resizer"
-      :class="{ 'is-active': resizing === 'outline' }"
-      role="separator"
-      aria-orientation="vertical"
-      title="드래그해서 너비 조절 · 더블클릭 시 초기화"
-      @pointerdown="startResize('outline', $event)"
-      @dblclick="review.resetLayout()"
-    />
+      <div
+        class="resizer"
+        :class="{ 'is-active': resizing === 'outline' }"
+        role="separator"
+        aria-orientation="vertical"
+        title="드래그해서 너비 조절 · 더블클릭 시 초기화"
+        @pointerdown="startResize('outline', $event)"
+        @dblclick="review.resetLayout()"
+      />
 
-    <DocumentViewer />
+      <DocumentViewer />
 
-    <div
-      class="resizer"
-      :class="{ 'is-active': resizing === 'panel' }"
-      role="separator"
-      aria-orientation="vertical"
-      title="드래그해서 너비 조절 · 더블클릭 시 초기화"
-      @pointerdown="startResize('panel', $event)"
-      @dblclick="review.resetLayout()"
-    />
+      <div
+        class="resizer"
+        :class="{ 'is-active': resizing === 'panel' }"
+        role="separator"
+        aria-orientation="vertical"
+        title="드래그해서 너비 조절 · 더블클릭 시 초기화"
+        @pointerdown="startResize('panel', $event)"
+        @dblclick="review.resetLayout()"
+      />
 
-    <aside class="panel" :style="{ width: `${panelWidth}px` }">
-      <div class="panel__content">
-        <FindingList v-if="panelTab === 'findings'" />
-        <AskPanel v-else-if="panelTab === 'ask'" />
-        <AnnotationList v-else />
-      </div>
+      <aside class="panel" :style="{ width: `${panelWidth}px` }">
+        <div class="panel__content">
+          <FindingList v-if="panelTab === 'findings'" />
+          <AskPanel v-else-if="panelTab === 'ask'" />
+          <AnnotationList v-else />
+        </div>
 
-      <nav class="panel__rail" aria-label="검토 패널 전환">
-        <button
-          type="button"
-          :class="{ 'is-active': panelTab === 'findings' }"
-          aria-label="검토 결과"
-          title="검토 결과"
-          @click="panelTab = 'findings'"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
-          </svg>
-          <span v-if="findings.length" class="panel__count">{{ findings.length }}</span>
-        </button>
-        <button
-          type="button"
-          :class="{ 'is-active': panelTab === 'ask' }"
-          aria-label="AI 질문"
-          title="AI 질문"
-          @click="panelTab = 'ask'"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M8.5 9a3.5 3.5 0 1 1 5.8 2.63C13.1 12.6 12 13.2 12 15M12 19h.01" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          :class="{ 'is-active': panelTab === 'annotations' }"
-          aria-label="주석"
-          title="주석"
-          @click="panelTab = 'annotations'"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4" />
-          </svg>
-        </button>
-      </nav>
-    </aside>
+        <nav class="panel__rail" aria-label="검토 패널 전환">
+          <button
+            type="button"
+            :class="{ 'is-active': panelTab === 'findings' }"
+            aria-label="검토 결과"
+            title="검토 결과"
+            @click="panelTab = 'findings'"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+            </svg>
+            <span v-if="findings.length" class="panel__count">{{ findings.length }}</span>
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': panelTab === 'ask' }"
+            aria-label="AI 질문"
+            title="AI 질문"
+            @click="panelTab = 'ask'"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8.5 9a3.5 3.5 0 1 1 5.8 2.63C13.1 12.6 12 13.2 12 15M12 19h.01" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            :class="{ 'is-active': panelTab === 'annotations' }"
+            aria-label="주석"
+            title="주석"
+            @click="panelTab = 'annotations'"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4" />
+            </svg>
+          </button>
+        </nav>
+      </aside>
+    </div>
+
+    <div v-if="loading" class="overlay">검토 데이터를 불러오는 중…</div>
+    <div v-else-if="error" class="overlay overlay--error">{{ error }}</div>
   </div>
-
-  <div v-if="loading" class="overlay">검토 데이터를 불러오는 중…</div>
-  <div v-else-if="error" class="overlay overlay--error">{{ error }}</div>
 </template>
 
 <style scoped>
+.review {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .bar {
   height: var(--header-h);
   flex: none;
@@ -188,8 +198,11 @@ async function complete() {
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-surface);
+  border-bottom: 1px solid var(--mat-hairline);
+  background: var(--mat-chrome);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  z-index: 10;
 }
 .bar__back {
   font-size: var(--fs-md);
@@ -220,8 +233,8 @@ async function complete() {
 }
 .bar__divider {
   width: 1px;
-  height: 18px;
-  background: var(--c-border);
+  height: 16px;
+  background: var(--mat-hairline-strong);
 }
 
 .body {
@@ -232,7 +245,9 @@ async function complete() {
 .panel {
   flex: none;
   display: flex;
-  background: var(--c-surface);
+  background: var(--mat-panel);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
 }
 .panel__content {
   flex: 1;
@@ -248,8 +263,8 @@ async function complete() {
   align-items: center;
   gap: 6px;
   padding: 8px 6px;
-  border-left: 1px solid var(--c-border);
-  background: var(--c-bg-subtle);
+  border-left: 1px solid var(--mat-hairline);
+  background: var(--mat-sidebar);
 }
 .panel__rail button {
   position: relative;
@@ -260,13 +275,23 @@ async function complete() {
   border-radius: var(--r-md);
   color: var(--c-text-muted);
 }
+.panel__rail button {
+  transition:
+    background var(--transition),
+    color var(--transition),
+    transform var(--dur-fast) var(--ease-spring);
+}
 .panel__rail button:hover {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
   color: var(--c-text);
 }
+.panel__rail button:active {
+  transform: scale(0.92);
+}
 .panel__rail button.is-active {
-  background: var(--c-primary-50);
-  color: var(--c-primary-700);
+  background: var(--c-primary-500);
+  color: #fff;
+  box-shadow: var(--shadow-inner-top), var(--shadow-sm);
 }
 .panel__rail svg {
   width: 20px;
@@ -306,7 +331,7 @@ async function complete() {
   width: 1px;
   height: 100%;
   margin: 0 auto;
-  background: var(--c-border);
+  background: var(--mat-hairline);
 }
 .resizer:hover,
 .resizer.is-active {

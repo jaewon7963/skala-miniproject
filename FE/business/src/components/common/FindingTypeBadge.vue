@@ -27,8 +27,8 @@ const label = computed(() => FINDING_TYPE_LABEL[props.type] ?? props.type)
   display: inline-flex;
   align-items: center;
   height: 20px;
-  padding: 0 7px;
-  border-radius: var(--r-sm);
+  padding: 0 8px;
+  border-radius: var(--r-full);
   font-size: var(--fs-xs);
   font-weight: 700;
   white-space: nowrap;

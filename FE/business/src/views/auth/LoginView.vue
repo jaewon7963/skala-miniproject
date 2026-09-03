@@ -132,24 +132,23 @@ async function submit() {
   font-size: var(--fs-sm);
 }
 .divider {
-  position: relative;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 20px 0 14px;
 }
-.divider::before {
+.divider::before,
+.divider::after {
   content: '';
-  position: absolute;
-  inset: 50% 0 auto;
+  flex: 1;
   height: 1px;
-  background: var(--c-border);
+  background: var(--mat-hairline);
 }
 .divider span {
-  position: relative;
-  background: var(--c-surface);
-  padding: 0 10px;
   color: var(--c-text-subtle);
   font-size: var(--fs-sm);
 }
+
 .sso {
   display: flex;
   flex-direction: column;

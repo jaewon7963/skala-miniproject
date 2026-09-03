@@ -507,6 +507,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   flex-direction: column;
   background: var(--c-bg-subtle);
 }
+.viewer__scroll {
+  background:
+    radial-gradient(620px 300px at 50% 0%, var(--mat-fill), transparent 70%);
+}
 .selection-mark {
   cursor: pointer;
   padding: 1px 0;
@@ -680,8 +684,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   align-items: center;
   gap: 12px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-surface);
+  border-bottom: 1px solid var(--mat-hairline);
+  background: var(--mat-chrome);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
 }
 .toolbar__group {
   display: flex;
@@ -694,8 +700,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   border-radius: var(--r-sm);
   color: var(--c-text-muted);
 }
+.toolbar__group button {
+  transition:
+    background var(--transition),
+    transform var(--dur-fast) var(--ease-spring);
+}
 .toolbar__group button:hover {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
+}
+.toolbar__group button:active {
+  transform: scale(0.9);
 }
 .toolbar__zoom {
   width: auto !important;
@@ -705,11 +719,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
 }
 .toolbar__page {
   width: 40px;
-  height: 26px;
+  height: 24px;
   text-align: center;
-  border: 1px solid var(--c-border);
+  border: 1px solid var(--mat-hairline);
   border-radius: var(--r-sm);
+  background: var(--mat-fill);
   font-size: var(--fs-sm);
+}
+.toolbar__page:focus {
+  outline: none;
+  background: var(--c-surface);
+  box-shadow: var(--ring);
 }
 .toolbar__total {
   font-size: var(--fs-sm);
@@ -729,10 +749,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', closeOnEscape))
   margin: 0 auto;
   min-height: 900px;
   padding: 44px 48px;
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: 4px;
-  box-shadow: var(--shadow-sm);
+  background: var(--c-paper);
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
   position: relative;
 }
 .paper__page {

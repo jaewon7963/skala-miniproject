@@ -29,13 +29,14 @@ const { isDark, toggle } = useTheme()
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-radius: var(--r-md);
   color: var(--c-text-muted);
   font-size: var(--fs-md);
+  transition: background var(--transition);
 }
 .theme:hover {
-  background: var(--c-surface-hover);
+  background: var(--mat-fill);
   color: var(--c-text);
 }
 .theme__icon {
@@ -49,28 +50,29 @@ const { isDark, toggle } = useTheme()
 }
 .theme__track {
   position: relative;
-  width: 32px;
-  height: 18px;
+  width: 38px;
+  height: 22px;
   flex: none;
   border-radius: var(--r-full);
-  background: var(--c-border-strong);
-  transition: background var(--transition);
+  background: var(--mat-fill-strong);
+  box-shadow: inset 0 1px 2px rgba(28, 25, 23, 0.12);
+  transition: background var(--dur) var(--ease-out);
 }
 .theme__track i {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--c-surface);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(28, 25, 23, 0.3);
+  transition: transform var(--dur) var(--ease-spring);
 }
 .theme__track.is-on {
   background: var(--c-primary-500);
 }
 .theme__track.is-on i {
-  transform: translateX(14px);
+  transform: translateX(16px);
 }
 </style>

@@ -27,7 +27,14 @@ body {
   font-size: var(--fs-base);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: var(--ls-normal);
   word-break: keep-all;
+}
+
+::selection {
+  background: var(--c-primary-200);
+  color: var(--c-text);
 }
 
 h1,
@@ -63,6 +70,9 @@ textarea {
 input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--c-primary-500);
+  width: 15px;
+  height: 15px;
+  border-radius: var(--r-xs);
 }
 
 button {
@@ -80,6 +90,7 @@ table {
 :focus-visible {
   outline: 2px solid var(--c-primary-500);
   outline-offset: 2px;
+  border-radius: var(--r-xs);
 }
 
 /* ---------- 공통 유틸 ---------- */
@@ -100,21 +111,48 @@ table {
   flex: 1;
 }
 .u-card {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--r-lg);
+  background: var(--mat-card);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-inner-top), var(--shadow-sm);
 }
 .u-scroll {
   overflow-y: auto;
   scrollbar-width: thin;
 }
 .u-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
+}
+.u-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 .u-scroll::-webkit-scrollbar-thumb {
-  background: var(--c-border-strong);
+  background: var(--mat-hairline-strong);
+  border: 2px solid transparent;
+  background-clip: content-box;
   border-radius: var(--r-full);
+}
+.u-scroll:hover::-webkit-scrollbar-thumb {
+  background: var(--c-text-subtle);
+  background-clip: content-box;
+}
+
+/* ---------- 머티리얼 유틸 ---------- */
+.u-glass {
+  background: var(--mat-card);
+  backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  -webkit-backdrop-filter: blur(var(--mat-blur)) saturate(var(--mat-saturate));
+  border: 1px solid var(--mat-hairline);
+  box-shadow: var(--shadow-inner-top), var(--shadow-sm);
+}
+.u-hairline-b {
+  border-bottom: 1px solid var(--mat-hairline);
+}
+.u-hairline-t {
+  border-top: 1px solid var(--mat-hairline);
 }
 
 /* ---------- 폼 라벨/에러 ---------- */
@@ -143,13 +181,34 @@ body.is-resizing * {
 }
 
 /* ---------- 화면 전환 ---------- */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity var(--transition);
+.fade-enter-active {
+  transition:
+    opacity var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-spring);
 }
-.fade-enter-from,
+.fade-leave-active {
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px) scale(0.995);
+}
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ---------- 모션 최소화 설정 존중 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ---------- 인쇄(검토 의견서) ---------- */

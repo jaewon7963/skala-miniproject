@@ -1,7 +1,8 @@
 /* ============================================================
    BizXray Design Tokens
    배경: 화이트 / 메인: 오렌지 / 서브: 레드
-   색상 변경이 필요하면 이 파일만 수정합니다.
+   머티리얼: Apple 계열 반투명(Liquid Glass) — 크롬 표면은 배경을 비칩니다.
+   색상 · 재질 변경이 필요하면 이 파일만 수정합니다.
    ============================================================ */
 :root {
   /* --- Brand : Orange (main) --- */
@@ -24,12 +25,13 @@
 
   /* --- Neutral --- */
   --c-white: #ffffff;
-  --c-bg: #ffffff;
-  --c-bg-subtle: #fafaf9;
+  --c-bg: #f6f5f3;
+  --c-bg-subtle: #f1efec;
   --c-surface: #ffffff;
-  --c-surface-hover: #f7f6f5;
-  --c-border: #e8e6e3;
-  --c-border-strong: #d6d3d1;
+  --c-surface-hover: #f4f2ef;
+  --c-paper: #ffffff;
+  --c-border: #e6e3df;
+  --c-border-strong: #d3cfc9;
   --c-text: #1c1917;
   --c-text-muted: #78716c;
   --c-text-subtle: #a8a29e;
@@ -39,10 +41,33 @@
   --c-info-50: #eaf6ff;
   --c-success-500: #15803d;
   --c-success-50: #eefaf2;
+  --c-success-border: #9dd3b0;
 
-  /* --- 반투명 표면(헤더 블러) · 반전 표면(토스트 · 툴팁) --- */
-  --c-surface-blur: rgba(255, 255, 255, 0.88);
-  --c-inverse-bg: #1c1917;
+  /* --- Material : 반투명 표면 --------------------------------
+     chrome   헤더 · 내비게이션처럼 콘텐츠 위에 떠 있는 막
+     sidebar  사이드바 · 목차처럼 넓은 보조 영역
+     panel    검토 패널처럼 콘텐츠와 나란한 영역
+     card     카드 · 시트 · 팝오버
+     fill     입력 필드 · 세그먼트 트랙 (iOS system fill)
+     hairline 1px 구분선 (불투명 회색 대신 반투명)
+     ---------------------------------------------------------- */
+  --mat-blur: 22px;
+  --mat-blur-sm: 12px;
+  --mat-saturate: 180%;
+  --mat-chrome: rgba(255, 255, 255, 0.68);
+  --mat-sidebar: rgba(255, 255, 255, 0.55);
+  --mat-panel: rgba(255, 255, 255, 0.62);
+  --mat-card: rgba(255, 255, 255, 0.78);
+  --mat-fill: rgba(120, 113, 108, 0.1);
+  --mat-fill-strong: rgba(120, 113, 108, 0.17);
+  --mat-hairline: rgba(28, 25, 23, 0.09);
+  --mat-hairline-strong: rgba(28, 25, 23, 0.15);
+  --mat-highlight: rgba(255, 255, 255, 0.7);
+  --mat-scrim: rgba(28, 25, 23, 0.28);
+
+  /* 하위 호환 (기존 컴포넌트에서 사용 중) */
+  --c-surface-blur: var(--mat-chrome);
+  --c-inverse-bg: rgba(38, 34, 31, 0.82);
   --c-inverse-fg: #ffffff;
 
   /* --- Semantic : 검토 결과 유형 --- */
@@ -53,21 +78,26 @@
   --c-finding-evidence: var(--c-info-500);
   --c-finding-evidence-bg: var(--c-info-50);
 
-  /* --- Radius --- */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  /* --- Radius : Apple 계열로 한 단계 크게 --- */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 11px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 26px;
   --r-full: 999px;
 
-  /* --- Elevation --- */
-  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.06);
-  --shadow-md: 0 4px 16px rgba(28, 25, 23, 0.08);
-  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.12);
-  --ring: 0 0 0 3px var(--c-primary-100);
+  /* --- Elevation : 얕고 넓게 퍼지는 그림자 --- */
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.05), 0 1px 1px rgba(28, 25, 23, 0.03);
+  --shadow-md: 0 4px 14px rgba(28, 25, 23, 0.07), 0 1px 3px rgba(28, 25, 23, 0.05);
+  --shadow-lg: 0 18px 44px rgba(28, 25, 23, 0.14), 0 4px 12px rgba(28, 25, 23, 0.07);
+  --shadow-inner-top: inset 0 1px 0 var(--mat-highlight);
+  --ring: 0 0 0 3.5px rgba(255, 106, 0, 0.22);
 
-  /* --- Typography --- */
-  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
-    'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  /* --- Typography : macOS 시스템 폰트 우선 --- */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Pretendard',
+    'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs-md: 13px;
@@ -75,15 +105,24 @@
   --fs-lg: 16px;
   --fs-xl: 20px;
   --fs-2xl: 26px;
+  --ls-tight: -0.022em;
+  --ls-normal: -0.01em;
+  --ls-caps: 0.06em;
+
+  /* --- Motion : Apple 표준 이징 --- */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 150ms;
+  --dur: 240ms;
+  --dur-slow: 420ms;
+  --transition: var(--dur-fast) var(--ease-out);
 
   /* --- Layout --- */
-  --header-h: 56px;
+  --header-h: 52px;
   --sidebar-w: 216px;
   --outline-w: 248px;
   --review-w: 400px;
   --content-max: 1280px;
-
-  --transition: 140ms ease;
 
   color-scheme: light;
 }
@@ -112,10 +151,11 @@
   --c-danger-700: #ff9d95;
 
   /* Neutral */
-  --c-bg: #121110;
-  --c-bg-subtle: #1a1917;
+  --c-bg: #0f0e0d;
+  --c-bg-subtle: #161513;
   --c-surface: #1c1b19;
-  --c-surface-hover: #262421;
+  --c-surface-hover: #272421;
+  --c-paper: #24211e;
   --c-border: #322f2c;
   --c-border-strong: #47423d;
   --c-text: #f2efec;
@@ -127,15 +167,27 @@
   --c-info-50: rgba(80, 174, 235, 0.16);
   --c-success-500: #4ade80;
   --c-success-50: rgba(74, 222, 128, 0.14);
+  --c-success-border: rgba(74, 222, 128, 0.45);
 
-  --c-surface-blur: rgba(18, 17, 16, 0.88);
-  --c-inverse-bg: #3a3633;
+  /* Material */
+  --mat-chrome: rgba(28, 27, 25, 0.62);
+  --mat-sidebar: rgba(22, 21, 19, 0.5);
+  --mat-panel: rgba(28, 27, 25, 0.55);
+  --mat-card: rgba(40, 37, 34, 0.6);
+  --mat-fill: rgba(255, 255, 255, 0.07);
+  --mat-fill-strong: rgba(255, 255, 255, 0.13);
+  --mat-hairline: rgba(255, 255, 255, 0.1);
+  --mat-hairline-strong: rgba(255, 255, 255, 0.17);
+  --mat-highlight: rgba(255, 255, 255, 0.07);
+  --mat-scrim: rgba(0, 0, 0, 0.48);
+
+  --c-inverse-bg: rgba(64, 59, 54, 0.85);
   --c-inverse-fg: #f7f5f3;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
-  --ring: 0 0 0 3px rgba(255, 122, 31, 0.28);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --ring: 0 0 0 3.5px rgba(255, 122, 31, 0.3);
 
   color-scheme: dark;
 }
