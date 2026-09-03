@@ -69,6 +69,30 @@ public class ReviewJobService {
         return view(job, meta);
     }
 
+    /**
+     * 명세 19. review_status 를 COMPLETED 로, completed_at 을 기록한다.
+     * status · parse_status 는 변경하지 않는다 (DEV3 D-8).
+     *
+     * 재완료 요청은 409 JOB_ALREADY_COMPLETED.
+     * status != DONE 인 Job 에는 409 DOCUMENT_NOT_READY 를 재사용한다 (미결 #10 확정).
+     */
+    @Transactional
+    public JobWithDocument completeReview(Long jobId, Long userId) {
+        ReviewJob job = reviewJobRepository.findById(jobId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        DocumentMetaView meta = requireOwnedDocument(job.getDocumentId(), userId);
+
+        if (job.isReviewCompleted()) {
+            throw new BusinessException(ErrorCode.JOB_ALREADY_COMPLETED);
+        }
+        if (job.getStatus() != JobStatus.DONE) {
+            throw new BusinessException(ErrorCode.DOCUMENT_NOT_READY);
+        }
+
+        job.completeReview();
+        return view(job, meta);
+    }
+
     /** summary 는 status = DONE 일 때만 채우고 그 외에는 null 이다 (DEV3 D-3). */
     private JobWithDocument view(ReviewJob job, DocumentMetaView meta) {
         JobSummaryView summary = job.getStatus() == JobStatus.DONE

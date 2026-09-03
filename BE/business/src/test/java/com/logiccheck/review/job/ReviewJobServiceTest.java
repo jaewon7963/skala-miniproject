@@ -148,6 +148,51 @@ class ReviewJobServiceTest {
     }
 
     @Test
+    void 검토_완료는_review_status_와_completed_at_만_바꾼다() {
+        ReviewJob done = withStatus(withId(ReviewJob.pending(1L), 42L), JobStatus.DONE);
+        when(repository.findById(42L)).thenReturn(Optional.of(done));
+
+        service.completeReview(42L, 7L);
+
+        assertThat(done.getReviewStatus()).isEqualTo(ReviewStatus.COMPLETED);
+        assertThat(done.getCompletedAt()).isNotNull();
+        assertThat(done.getStatus()).as("status 는 건드리지 않는다").isEqualTo(JobStatus.DONE);
+    }
+
+    @Test
+    void 재완료_요청은_JOB_ALREADY_COMPLETED_다() {
+        ReviewJob done = withStatus(withId(ReviewJob.pending(1L), 42L), JobStatus.DONE);
+        done.completeReview();
+        when(repository.findById(42L)).thenReturn(Optional.of(done));
+
+        assertThatErrorCode(() -> service.completeReview(42L, 7L), ErrorCode.JOB_ALREADY_COMPLETED);
+    }
+
+    @Test
+    void 분석이_끝나지_않은_Job_의_완료_요청은_DOCUMENT_NOT_READY_다() {
+        for (JobStatus status : new JobStatus[]{JobStatus.PENDING, JobStatus.RUNNING, JobStatus.FAILED}) {
+            ReviewJob job = withStatus(withId(ReviewJob.pending(1L), 42L), status);
+            when(repository.findById(42L)).thenReturn(Optional.of(job));
+
+            assertThatThrownBy(() -> service.completeReview(42L, 7L))
+                    .as("status = %s", status)
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.DOCUMENT_NOT_READY);
+        }
+    }
+
+    @Test
+    void 완료된_Job_도_terminal_과_status_는_그대로다() {
+        ReviewJob done = withStatus(withId(ReviewJob.pending(1L), 42L), JobStatus.DONE);
+        done.completeReview();
+
+        assertThat(done.getStatus().isTerminal()).isTrue();
+        assertThat(done.getStatus()).isEqualTo(JobStatus.DONE);
+        assertThat(done.isReviewCompleted()).isTrue();
+    }
+
+    @Test
     void terminal_은_DONE_FAILED_에만_true_다() {
         assertThat(JobStatus.PENDING.isTerminal()).isFalse();
         assertThat(JobStatus.RUNNING.isTerminal()).isFalse();

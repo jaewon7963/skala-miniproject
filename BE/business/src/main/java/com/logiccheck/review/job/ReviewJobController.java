@@ -20,7 +20,7 @@ import java.net.URI;
 import java.util.Map;
 
 /**
- * 명세 16 · 17 · 18.
+ * 명세 16 · 17 · 18 · 19.
  *
  * 18 번은 경로가 /api/documents/... 지만 리소스가 ReviewJob 이므로 개발자3 담당이다 (DEV3 B-3).
  * 개발자2의 DocumentController 와 같은 prefix 를 공유하므로 양쪽 다 와일드카드 매핑을 쓰지 않고
@@ -60,6 +60,13 @@ public class ReviewJobController {
     @GetMapping("/documents/{documentId}/review-jobs/latest")
     public ReviewJobResponse latest(@PathVariable Long documentId, @CurrentUser UserPrincipal user) {
         JobWithDocument found = reviewJobService.findLatestForOwner(documentId, user.userId());
+        return ReviewJobResponse.of(found.job(), found.document(), found.summary());
+    }
+
+    /** 19. 검토 완료 처리. */
+    @PostMapping("/review-jobs/{jobId}/complete")
+    public ReviewJobResponse complete(@PathVariable Long jobId, @CurrentUser UserPrincipal user) {
+        JobWithDocument found = reviewJobService.completeReview(jobId, user.userId());
         return ReviewJobResponse.of(found.job(), found.document(), found.summary());
     }
 

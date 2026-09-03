@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "review_jobs")
@@ -62,6 +63,19 @@ public class ReviewJob extends BaseTimeEntity {
      */
     public static ReviewJob pending(Long documentId) {
         return new ReviewJob(documentId);
+    }
+
+    /**
+     * 명세 19. review_status 와 completed_at 만 바꾼다.
+     * status 와 parse_status 는 건드리지 않는다 — 두 상태는 서로 독립이다 (DEV3 D-1 · D-8).
+     */
+    public void completeReview() {
+        this.reviewStatus = ReviewStatus.COMPLETED;
+        this.completedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    public boolean isReviewCompleted() {
+        return reviewStatus == ReviewStatus.COMPLETED;
     }
 
     public Long getId() {

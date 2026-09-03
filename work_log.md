@@ -357,3 +357,89 @@ curl -H 'X-User-Id: 1' http://localhost:8081/api/review-jobs/1
 **후속 과제**
 - 응답 추가 필드 3개(`errorCode` · `jobId` · `decidedAt` 제외 여부) v2 명세 대조
 - `FindingElement` 는 엔티티만 만들었고 파이프라인(S5)에서 채운다
+
+---
+
+## S4a — 주석 CRUD(24~27) + 검토 완료(19)
+
+- 2026-09-03
+- **계획과 순서를 바꿨다.** 원래 판정(23)을 먼저 하려 했지만, 미결 #5 채택으로 23번이
+  `annotationBody` 로 주석을 생성하므로 주석 쪽이 선행이다. 판정은 S4b 로 옮겼다.
+
+**추가**
+- `review/annotation/Annotation.java` · `AnnotationRepository.java`
+- `review/annotation/AnnotationService.java` · `AnnotationController.java`
+- `review/annotation/dto/CreateAnnotationRequest.java` · `UpdateAnnotationRequest.java`
+  · `AnnotationResponse.java` · `AnchorPayload.java`
+- 테스트 20건: `AnnotationServiceTest`(11) · `AnnotationControllerTest`(9)
+
+**변경**
+- `review/job/ReviewJob.java` — `completeReview()` · `isReviewCompleted()` 추가
+- `review/job/ReviewJobService.java` — `completeReview()` 추가
+- `review/job/ReviewJobController.java` — 19번 엔드포인트 추가
+- `ReviewJobServiceTest` — 완료 관련 4건 추가 (총 18건)
+
+**결정 · 편차**
+
+1. **`source` · `color` 컬럼과 필드를 두지 않았다** (D-7). `finding_id` 유무로 완전히 구분된다.
+   요청에 `source`/`color`/`authorId` 를 넣어 보내도 무시된다 — 확인함.
+
+2. **`author_id` 는 JWT 사용자로 고정.** 요청 DTO 에 필드가 없다.
+   `authorId: "999"` 를 보내도 DB 에는 인증 주체(1)가 저장된다 — 확인함.
+
+3. **`authorId` 를 응답에도 넣지 않았다.** MVP1 은 단독 사용자 검토라 표시할 곳이 없다.
+   협업 기능이 생기면 추가한다.
+
+4. **Finding 주석에 `anchor` 를 생략하면 해당 Finding 의 첫 evidence 를 복사한다** (api-spec 6-1).
+   좌표를 직접 보내면 그 값을 쓴다.
+
+5. **`anchor` 는 좌표도 인용문도 없으면 `null` 로 내린다.** 빈 객체를 만들지 않는다.
+
+6. **중첩 `@Valid` 누락으로 500 이 나던 버그를 잡았다.** `AnchorPayload.bbox` 에 `@Valid` 가 없어
+   `bbox.x = 1.5` 같은 값이 검증을 통과하고 DB CHECK 제약(`ck_annotations_bbox`)에서 터져
+   `DataIntegrityViolationException` → 500 이 됐다. `@Valid` + `@NotNull` 을 붙여 400 으로 바꿨다.
+   bbox 는 네 값이 전부 있어야 하고 각 값은 0~1 이다. `page` 는 `@Positive`.
+
+7. **19번은 `review_status` 와 `completed_at` 만 바꾼다** (D-8). `status` 를 건드리지 않는 것을
+   서비스 테스트와 DB 조회로 이중 확인했다.
+
+8. **미결 #10 적용**: `status != DONE` 인 Job 의 완료 요청 → 409 `DOCUMENT_NOT_READY`.
+   `PENDING` · `RUNNING` · `FAILED` 세 경우 모두 확인했다.
+
+9. **완료된 Job 에도 주석 생성 · 수정 · 삭제를 허용한다.** D-6 은 **판정**만 잠근다고 명시하고
+   주석에 대해서는 아무 말이 없어 문서를 문자 그대로 따랐다. 검토 완료 후 주석까지 잠글지는
+   기획 판단이 필요하다. **← 팀 확인 필요**
+
+10. **`bbox` 응답 값의 소수점 자리수가 입력에 따라 다르다.** 직접 보낸 값은 `0.12`,
+    evidence 에서 복사한 값은 `0.120000` 으로 나온다(BigDecimal scale). 수치는 동일하고
+    FE 의 숫자 파싱에 영향이 없어 정규화하지 않았다.
+
+**검증**
+
+- `./gradlew test` — 62건 통과 (Job 27 · Finding 15 · Annotation 20), 실패 0
+- `ddl-auto=validate` 통과 — `Annotation` 매핑이 스키마와 일치
+- 실제 Postgres 대상 curl E2E:
+
+  | 요청 | 결과 |
+  |---|---|
+  | `POST .../annotations` (자유 주석) | `201` · `findingId: null` · `anchor` 그대로 |
+  | `POST .../annotations` (findingId, anchor 생략) | `201` · 첫 evidence 좌표 복사 (`page 11`, `bbox 0.12/0.31/0.66/0.03`) |
+  | `authorId`·`source`·`color` 주입 시도 | 무시됨. DB `author_id = 1`(JWT 주체) |
+  | `body: "  "` | `400` · `details.body` |
+  | 다른 Job 의 `findingId` | `404 NOT_FOUND` |
+  | `bbox.x = 1.5` | `400` · `details["anchor.bbox.x"]` (수정 전 500) |
+  | `bbox` 일부 누락 | `400` · `w`·`h` 둘 다 |
+  | `anchor.page = 0` | `400` |
+  | `GET .../annotations` | `200` · 2건 · `source`·`color`·`authorId` 키 없음 |
+  | `PATCH /api/annotations/{id}` | `200` · `body` 만 변경, `updatedAt` 갱신 |
+  | `PATCH` 빈 본문 | `400` |
+  | `DELETE /api/annotations/{id}` | `204` · 본문 없음 |
+  | 재삭제 | `404` |
+  | 삭제 후 `GET .../annotations` | 1건만 (DB 에는 `deleted_at` 채워진 행이 남아 있음) |
+  | `POST .../complete` | `200` · `reviewStatus: COMPLETED` · `completedAt` 기록 |
+  | 완료 후 DB | `status = DONE`(불변) · `review_status = COMPLETED` |
+  | 재완료 | `409 JOB_ALREADY_COMPLETED` |
+  | `PENDING` Job 완료 요청 | `409 DOCUMENT_NOT_READY` |
+
+**후속 과제**
+- 검토 완료 후 주석 잠금 여부 (위 9번)
