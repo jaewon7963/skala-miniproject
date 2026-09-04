@@ -19,17 +19,23 @@ docker compose logs -f backend
 아래는 코드를 고쳐 가며 재시작할 때 쓰는 로컬 실행이다. DB부터 띄운다.
 
 ```bash
-# 저장소 루트에서 — dev 덧붙임 파일이 5432를 호스트로 열어 준다
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+# 저장소 루트에서 — PostgreSQL을 호스트 15432로 열어 준다
+docker compose up -d postgres
+
+cd BE/business && ./gradlew bootRun    # http://localhost:8081
 ```
 
-기본 `docker-compose.yml` 은 PostgreSQL 포트를 호스트로 **열지 않는다**(다른 사람 노트북의
-로컬 PostgreSQL과 겹치는 것을 막기 위해서다). 그래서 로컬 실행에는 위처럼 `docker-compose.dev.yml`
-을 얹어야 한다. 5432가 이미 쓰이고 있으면 포트를 바꾼다.
+**환경변수를 넘길 필요가 없다.** `bootRun` 은 `dev` 프로파일을 자동으로 켜고
+(`build.gradle` 의 `tasks.named('bootRun')`), `src/main/resources/application-dev.properties` 가
+DB 접속 정보·JWT 키·데모 시드 기본값을 채운다. 그래서 컨테이너로 띄웠을 때와 **똑같이**
+데모 계정(`kim@company.com` / `logic1234`)과 검토가 끝난 문서 1건이 들어 있다.
+
+PostgreSQL을 5432가 아니라 15432로 여는 이유는, 개발자 노트북에 로컬 PostgreSQL이 이미
+5432에 떠 있는 경우가 흔해서다. 15432마저 겹치면 포트를 바꾼다.
 
 ```bash
-POSTGRES_PORT=5433 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
-# 이후 실행 시 DB_URL=jdbc:postgresql://localhost:5433/business 를 함께 넘긴다
+POSTGRES_PORT=5433 docker compose up -d postgres
+cd BE/business && DB_URL=jdbc:postgresql://localhost:5433/business ./gradlew bootRun
 ```
 
 이미 로컬에 PostgreSQL이 있다면 도커 대신 그 서버에 롤과 DB만 만들어도 된다.
@@ -39,12 +45,25 @@ CREATE ROLE business LOGIN PASSWORD 'business';
 CREATE DATABASE business OWNER business;
 ```
 
+```bash
+cd BE/business && DB_URL=jdbc:postgresql://localhost:5432/business ./gradlew bootRun
+```
+
 ### 비밀번호와 서명 키
 
-`spring.datasource.password` 와 `jwt.secret` 은 **기본값을 두지 않는다.** 설정 파일에 값을
-적어 두면 저장소에 그대로 남기 때문이다. 둘 중 편한 쪽으로 넣는다.
+`application.properties` 의 `spring.datasource.password` 와 `jwt.secret` 은 **기본값을 두지 않는다.**
+컨테이너나 배포에서 값을 깜빡했을 때 시연용 시크릿으로 조용히 뜨는 것을 막기 위해서다.
+로컬 `bootRun` 에서만 `application-dev.properties` 가 그 자리를 채운다.
 
-**① 로컬 설정 파일** — 한 번 만들어 두면 그 뒤로는 신경 쓸 게 없다.
+덮어쓰는 방법은 셋이다.
+
+**① 환경변수** — 가장 간단하다. CI·배포도 이 방식이다.
+
+```bash
+DB_PASSWORD=... JWT_SECRET='32바이트 이상 문자열' ./gradlew bootRun
+```
+
+**② 개인 설정 파일** — 내 값만 계속 쓰고 싶을 때.
 
 `src/main/resources/application-local.properties` (`.gitignore` 되어 커밋되지 않는다)
 
@@ -54,37 +73,31 @@ jwt.secret=bizxray-local-development-secret-key-32b
 ```
 
 ```bash
-cd BE/business && ./gradlew bootRun --args='--spring.profiles.active=local'
+# dev 위에 local 을 얹는다. local 만 켜면 dev 기본값이 빠져 기동에 실패한다.
+SPRING_PROFILES_ACTIVE=dev,local ./gradlew bootRun
 ```
 
-**② 환경변수** — CI나 배포에서 쓴다.
+**③ 커맨드라인 인자** — 일회성.
 
 ```bash
-DB_PASSWORD=business JWT_SECRET='32바이트 이상 문자열' ./gradlew bootRun
+./gradlew bootRun --args='--spring.profiles.active=dev,local'
 ```
-
-둘 다 없으면 기동 단계에서 placeholder 를 못 채워 실패한다.
 
 그 밖에 덮어쓸 수 있는 값: `DB_URL` · `DB_USERNAME` · `DOCUMENT_STORAGE_DIR` ·
 `CORS_ALLOWED_ORIGINS` · `DEMO_SEED_ENABLED`.
 `jwt.secret` 은 32바이트 이상이어야 하며, 짧으면 기동 시 거부한다.
 
-`bootRun` 으로 직접 띄우면 데모 계정은 심기지 않는다(`DEMO_SEED_ENABLED` 기본값 `false`).
-빈 DB에서 시작하면서 데모 데이터도 원하면 `DEMO_SEED_ENABLED=true` 를 함께 넘긴다.
+데모 데이터 없이 빈 DB로 시작하고 싶으면 `DEMO_SEED_ENABLED=false ./gradlew bootRun`.
 
 ## 프런트엔드와 함께 띄우기
 
-`FE/business/.env` 를 만들면 화면이 내부 목업 대신 이 서버를 쓴다. 없으면 목업 모드로 돈다.
-
-```
-VITE_USE_MOCK=false
-VITE_API_BASE_URL=/api
-VITE_API_PROXY_TARGET=http://localhost:8081
-```
+프런트는 기본값이 이미 실제 API라 별도 설정이 없다.
 
 ```bash
 cd FE/business && npm install && npm run dev   # http://localhost:5173
 ```
+
+백엔드 없이 화면만 볼 때는 `npm run dev:mock` 으로 내부 목업을 쓴다.
 
 개발 서버가 `/api` 를 8081로 넘겨주므로 CORS 설정 없이 그대로 붙는다.
 

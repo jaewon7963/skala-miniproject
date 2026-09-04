@@ -6,22 +6,33 @@
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev       # http://localhost:5173 — 실제 백엔드(8081)에 붙습니다
+npm run dev:mock  # 백엔드 없이 내부 목업으로 화면만 봅니다
 npm run build
 npm run lint
 ```
 
-전체 스택(프런트 + 백엔드 + DB)을 한 번에 띄우려면 저장소 루트에서 `docker compose up -d --build`.
-데모 계정 `kim@company.com` / `logic1234` 로 로그인하면 AI 검토가 끝난 문서 1건이 들어 있다.
+`npm run dev` 는 백엔드가 8081에 떠 있는 것을 전제로 합니다. 저장소 루트에서:
+
+```bash
+docker compose up -d postgres
+cd BE/business && ./gradlew bootRun
+```
+
+전체 스택(프런트 + 백엔드 + DB)을 컨테이너로 한 번에 띄우려면 저장소 루트에서 `docker compose up -d --build`.
+단 그때는 컨테이너가 5173을 쓰므로 `npm run dev` 와 동시에는 못 띄웁니다.
+데모 계정 `kim@company.com` / `logic1234` 로 로그인하면 AI 검토가 끝난 문서 1건이 들어 있습니다.
 자세한 조합은 [루트 README](../../README.md) 참고.
 
 ## Mock ↔ 실제 백엔드 전환
 
 이 프로젝트의 화면은 **API 계약(JSON 구조)** 위에서 동작합니다.
-BE가 준비되면 `.env.development` 의 값 하나만 바꾸면 됩니다.
+전환은 스크립트로 갈립니다 — `npm run dev` 는 실제 API, `npm run dev:mock` 은 목업(`.env.mock`).
+
+값을 직접 고정하고 싶으면 `cp .env.example .env` 후 아래를 조정합니다.
 
 ```env
-VITE_USE_MOCK=false                          # true = Mock, false = 실제 API
+VITE_USE_MOCK=false                          # true = Mock, false = 실제 API (기본 false)
 VITE_API_BASE_URL=/api
 VITE_API_PROXY_TARGET=http://localhost:8081  # Spring Boot
 ```

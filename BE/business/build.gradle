@@ -45,6 +45,16 @@ tasks.named('test') {
 	useJUnitPlatform()
 }
 
+// 로컬 실행(bootRun)에만 dev 프로파일을 켠다. application-dev.properties 가
+// DB 비밀번호·JWT 키·데모 시드 기본값을 채워 주므로 환경변수 없이 그대로 뜬다.
+// bootJar 로 만든 컨테이너 이미지에는 영향이 없다.
+tasks.named('bootRun') {
+	systemProperty 'spring.profiles.active',
+		System.getProperty('spring.profiles.active')
+			?: System.getenv('SPRING_PROFILES_ACTIVE')
+			?: 'dev'
+}
+
 // ---------------------------------------------------------------------------
 // 시연용 데모 PDF
 // ---------------------------------------------------------------------------
