@@ -33,6 +33,8 @@ function loadLayout() {
  */
 export const useReviewStore = defineStore('review', () => {
   const job = ref(null)
+  /** 현재 검토 중인 문서 (제목 · 쪽수) — 챗봇 컨텍스트에도 씁니다. */
+  const document = ref(null)
   const sections = ref([])
   const pages = ref([])
   const findings = ref([])
@@ -293,6 +295,7 @@ export const useReviewStore = defineStore('review', () => {
 
   function reset() {
     job.value = null
+    document.value = null
     sections.value = []
     pages.value = []
     findings.value = []
@@ -306,6 +309,7 @@ export const useReviewStore = defineStore('review', () => {
 
   return {
     job,
+    document,
     sections,
     pages,
     findings,
