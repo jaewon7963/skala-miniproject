@@ -38,6 +38,7 @@ docker compose up -d --build
 |---|---|
 | 프런트엔드 | <http://localhost:5173> |
 | 백엔드 | <http://localhost:8081/api/health> |
+| **API 문서 (Swagger)** | <http://localhost:8081/swagger-ui.html> |
 | **데모 계정** | **`kim@company.com` / `logic1234`** |
 
 로그인하면 문서함에 `AI 매장 안내 로봇 사업계획서`(8쪽)가 **검토 중** 상태로 들어 있다. 검토 화면에서 AI가 찾아낸 5건을 확인할 수 있다.
@@ -148,8 +149,11 @@ JWT_SECRET=bizxray-local-demo-signing-key-change-me-0123456789 \
 ### 테스트
 
 ```bash
-# 스택이 떠 있는 상태에서 — API 기능 63건 점검 (업로드→분석→판정→리포트 전체 흐름)
+# 스택이 떠 있는 상태에서 — API 기능 점검 (업로드→분석→판정→리포트 전체 흐름)
 ./scripts/smoke-test.sh
+
+# 프런트가 부르는 경로와 백엔드가 실제 제공하는 경로 대조 (/v3/api-docs 기준)
+./scripts/check-endpoints.sh
 
 cd BE/business
 ./gradlew test                                   # 전체 (Testcontainers — 도커 데몬 필요)
