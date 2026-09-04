@@ -35,30 +35,29 @@ AUTH="Authorization: Bearer $TOK"
 check "GET /auth/me" "$(curl -s -H "$AUTH" $BASE/auth/me | J 'd["organization"]')" "company.com"
 check "GET /tags (기준 데이터 7건)" "$(curl -s -H "$AUTH" $BASE/tags | J 'len(d)')" "7"
 
+# 데모 계정은 사람이 실제로 쓰는 계정이다. 문서를 더 올리거나 검토를 진행했을 수 있으므로
+# "문서 몇 건" 같은 전제를 두지 않고, 시드된 문서를 이름으로 찾아 그것만 확인한다.
+# 검토 항목 개수처럼 사람 손을 타는 값은 B(임시 계정)에서 정확히 본다.
 DOCS=$(curl -s -H "$AUTH" $BASE/documents)
-check "GET /documents — 문서 1건" "$(echo "$DOCS" | J 'd["total"]')" "1"
-check "GET /documents — 상태 배지" "$(echo "$DOCS" | J 'd["items"][0]["status"]')" "REVIEWING"
-check "GET /documents — 페이지 수" "$(echo "$DOCS" | J 'd["items"][0]["pageCount"]')" "8"
+DEMO_ID=$(echo "$DOCS" | J '[i["id"] for i in d["items"] if i["name"].startswith("AI 매장 안내 로봇")][0]')
+if [ -n "$DEMO_ID" ]; then ok "시드된 시연 문서를 찾음" "id=$DEMO_ID"; else bad "시드된 시연 문서" "문서함에 없음"; fi
 
-check "GET /documents?q=로봇 (검색)" "$(curl -s -H "$AUTH" "$BASE/documents?q=%EB%A1%9C%EB%B4%87" | J 'd["total"]')" "1"
+check "GET /documents?q=로봇 (검색)" "$(curl -s -H "$AUTH" "$BASE/documents?q=%EB%A1%9C%EB%B4%87" | J 'str(d["total"] >= 1)')" "True"
 check "GET /documents?q=없는말 (검색 0건)" "$(curl -s -H "$AUTH" "$BASE/documents?q=zzzznope" | J 'd["total"]')" "0"
-check "GET /documents?status=DONE (필터)" "$(curl -s -H "$AUTH" "$BASE/documents?status=DONE" | J 'd["total"]')" "0"
-check "GET /documents/1" "$(curl -s -H "$AUTH" $BASE/documents/1 | J 'd["name"]')" "AI 매장 안내 로봇 사업계획서"
-check "GET /documents/1/parse-status" "$(curl -s -H "$AUTH" $BASE/documents/1/parse-status | J 'd["parseStatus"]')" "DONE"
-check "GET /documents/1/sections (목차 8)" "$(curl -s -H "$AUTH" $BASE/documents/1/sections | J 'len(d)')" "8"
-check "GET /documents/1/pages (본문 8쪽)" "$(curl -s -H "$AUTH" $BASE/documents/1/pages | J 'len(d)')" "8"
-check "GET /documents/1/file (PDF 원본)" "$(curl -s -o /dev/null -w '%{http_code} %{size_download}' -H "$AUTH" $BASE/documents/1/file)" "200 53478"
+check "GET /documents/\$DEMO_ID — 페이지 수" "$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID | J 'd["pageCount"]')" "8"
+check "GET /documents/\$DEMO_ID" "$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID | J 'd["name"]')" "AI 매장 안내 로봇 사업계획서"
+check "GET /documents/$DEMO_ID/parse-status" "$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID/parse-status | J 'd["parseStatus"]')" "DONE"
+check "GET /documents/$DEMO_ID/sections (목차 8)" "$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID/sections | J 'len(d)')" "8"
+check "GET /documents/$DEMO_ID/pages (본문 8쪽)" "$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID/pages | J 'len(d)')" "8"
+check "GET /documents/$DEMO_ID/file (PDF 원본)" "$(curl -s -o /dev/null -w '%{http_code} %{size_download}' -H "$AUTH" $BASE/documents/$DEMO_ID/file)" "200 53478"
 
-JOB=$(curl -s -H "$AUTH" $BASE/documents/1/review-jobs/latest)
+JOB=$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID/review-jobs/latest)
 JID=$(echo "$JOB" | J 'd["id"]')
-check "GET /documents/1/review-jobs/latest" "$(echo "$JOB" | J 'd["status"]')" "DONE"
-check "  검토 항목 총 건수" "$(echo "$JOB" | J 'd["summary"]["total"]')" "5"
-check "  유형 분포 ERROR" "$(echo "$JOB" | J 'd["summary"]["byType"]["ERROR"]')" "2"
-check "  유형 분포 NEEDS_CHECK" "$(echo "$JOB" | J 'd["summary"]["byType"]["NEEDS_CHECK"]')" "1"
-check "  유형 분포 NO_EVIDENCE" "$(echo "$JOB" | J 'd["summary"]["byType"]["NO_EVIDENCE"]')" "2"
-check "  미판정 상태 유지 (시연 준비)" "$(echo "$JOB" | J 'd["summary"]["decided"]')" "0"
+check "GET /documents/$DEMO_ID/review-jobs/latest" "$(echo "$JOB" | J 'd["status"]')" "DONE"
+check "  검토 항목이 5건 이상 남아 있음" "$(echo "$JOB" | J 'str(d["summary"]["total"] >= 5)')" "True"
+check "  세 유형이 모두 나옴" "$(echo "$JOB" | J 'str(all(d["summary"]["byType"].get(k,0) > 0 for k in ("ERROR","NEEDS_CHECK","NO_EVIDENCE")))')" "True"
 
-check "GET /review-jobs/$JID/findings" "$(curl -s -H "$AUTH" $BASE/review-jobs/$JID/findings | J 'len(d)')" "5"
+check "GET /review-jobs/$JID/findings" "$(curl -s -H "$AUTH" $BASE/review-jobs/$JID/findings | J 'str(len(d) >= 5)')" "True"
 check "GET /review-jobs/$JID/pages" "$(curl -s -H "$AUTH" $BASE/review-jobs/$JID/pages | J 'len(d)')" "8"
 
 # 근거 앵커가 실제 원문 블록을 가리키는지 (화면 하이라이트 점프의 조건)
@@ -170,11 +169,10 @@ check "POST /auth/logout" "$(code -X POST $BASE/auth/logout -H "Authorization: B
 check "DELETE /auth/me (임시 계정 탈퇴)" "$(code -X DELETE $BASE/auth/me -H "Authorization: Bearer $TOK3" -H 'Content-Type: application/json' -d '{"password":"smoke5678"}')" "200"
 
 echo
-echo "━━━ E. 데모 상태가 그대로인지 재확인 ━━━"
-FIN=$(curl -s -H "$AUTH" $BASE/documents/1/review-jobs/latest)
-check "데모 문서 여전히 검토 중" "$(echo "$FIN" | J 'd["status"]')" "DONE"
-check "데모 문서 판정 0건 유지" "$(echo "$FIN" | J 'd["summary"]["decided"]')" "0"
-check "데모 계정 문서 1건 유지" "$(curl -s -H "$AUTH" $BASE/documents | J 'd["total"]')" "1"
+echo "━━━ E. 데모 계정이 손상되지 않았는지 ━━━"
+FIN=$(curl -s -H "$AUTH" $BASE/documents/$DEMO_ID/review-jobs/latest)
+check "시연 문서 분석 결과 살아 있음" "$(echo "$FIN" | J 'd["status"]')" "DONE"
+check "시연 문서 여전히 조회됨" "$(code -H "$AUTH" $BASE/documents/$DEMO_ID)" "200"
 
 echo
 printf "════ 통과 \033[32m%d\033[0m · 실패 \033[31m%d\033[0m ════\n" $PASS $FAIL
