@@ -85,6 +85,7 @@ onMounted(async () => {
   if (review.job?.documentId) {
     const doc = applyName(await documentApi.get(review.job.documentId))
     documentTitle.value = doc.name
+    review.document = doc
   }
 })
 onUnmounted(() => {

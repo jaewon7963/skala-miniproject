@@ -1,5 +1,7 @@
 export { authApi } from './modules/auth'
 export { documentApi } from './modules/documents'
 export { reviewApi } from './modules/reviews'
+export { chatApi } from './modules/chat'
 export { ApiError, tokenStore } from './http'
 export { USE_MOCK } from './config'
+export { LLM_READY } from './llm/config'
