@@ -28,7 +28,11 @@ async function logout() {
       <RouterLink v-if="showBack" class="header__back" :to="{ name: 'library' }">
         ← 라이브러리
       </RouterLink>
-      <RouterLink :to="{ name: 'library' }"><BrandMark /></RouterLink>
+      <!-- 로고는 서비스 소개(웰컴) 화면으로 돌아갑니다.
+           라이브러리로 가는 길은 위의 '← 라이브러리' 링크가 맡습니다. -->
+      <RouterLink class="header__home" :to="{ name: 'welcome' }" title="BizXray 홈으로">
+        <BrandMark />
+      </RouterLink>
 
       <span class="u-spacer" />
 
@@ -69,6 +73,20 @@ async function logout() {
 }
 .header__back:hover {
   color: var(--c-primary-600);
+}
+/* 클릭 가능한 로고임을 알리는 최소한의 반응 */
+.header__home {
+  display: inline-flex;
+  border-radius: var(--r-sm);
+  transition:
+    opacity var(--transition),
+    transform var(--dur-fast) var(--ease-spring);
+}
+.header__home:hover {
+  opacity: 0.72;
+}
+.header__home:active {
+  transform: scale(0.97);
 }
 .header__avatar {
   width: 28px;
