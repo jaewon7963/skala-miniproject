@@ -55,8 +55,14 @@ public class DocumentCommandService {
     }
 
     public DocumentResponse upload(Long ownerId, MultipartFile file) {
-        byte[] content = readAll(file);
+        return upload(ownerId, readAll(file), file.getOriginalFilename());
+    }
 
+    /**
+     * 업로드 본체. 화면에서 올린 것이든 기동 시 심는 시연용 문서든 같은 길을 타야
+     * 검증·중복 판정·파싱 이벤트가 한 곳에서만 관리된다.
+     */
+    public DocumentResponse upload(Long ownerId, byte[] content, String originalFilename) {
         if (!startsWithPdfMagic(content)) {
             throw new BusinessException(ErrorCode.UNSUPPORTED_FILE_TYPE);
         }
@@ -70,7 +76,7 @@ public class DocumentCommandService {
         }
 
         String fileKey = storage.store(new ByteArrayInputStream(content));
-        String title = stripPdfExtension(file.getOriginalFilename());
+        String title = stripPdfExtension(originalFilename);
 
         Document document = Document.upload(ownerId, title, fileKey, hash, "application/pdf", content.length);
         try {

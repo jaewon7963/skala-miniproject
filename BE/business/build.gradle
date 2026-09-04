@@ -44,3 +44,40 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// ---------------------------------------------------------------------------
+// 시연용 데모 PDF
+// ---------------------------------------------------------------------------
+// 산출물(src/main/resources/demo/*.pdf)은 저장소에 커밋되어 있으므로 평소에는 돌릴 일이 없다.
+// DemoPdfContent 의 본문을 고쳤을 때만 ./gradlew generateDemoPdf 로 다시 만든다.
+
+def demoFont = layout.buildDirectory.file('fonts/NanumGothic-Regular.ttf')
+def demoPdfName = 'bizxray-demo-plan.pdf'
+
+tasks.register('downloadDemoFont') {
+	description = '데모 PDF에 임베드할 한글 폰트(나눔고딕, SIL OFL 1.1)를 내려받는다.'
+	outputs.file(demoFont)
+	doLast {
+		def target = demoFont.get().asFile
+		target.parentFile.mkdirs()
+		def source = 'https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf'
+		java.net.URI.create(source).toURL().withInputStream { input ->
+			target.withOutputStream { output -> output << input }
+		}
+	}
+}
+
+tasks.register('generateDemoPdf', JavaExec) {
+	group = 'demo'
+	// 이 태스크 자체가 test 클래스패스를 필요로 해서 processResources 뒤에 놓을 수 없다(순환).
+	// 그래서 PDF를 다시 만든 뒤에는 build/test 를 한 번 더 돌려야 새 리소스가 반영된다.
+	description = '시연용 사업계획서 PDF를 만들어 리소스와 docs/samples 에 쓴다.'
+	dependsOn 'downloadDemoFont'
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.logiccheck.demo.DemoPdfWriter'
+	argumentProviders.add({
+		[demoFont.get().asFile.absolutePath,
+		 file("src/main/resources/demo/${demoPdfName}").absolutePath,
+		 file("../../docs/samples/${demoPdfName}").absolutePath]
+	} as CommandLineArgumentProvider)
+}
