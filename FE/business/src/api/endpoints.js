@@ -11,6 +11,9 @@ export const EP = {
     password: '/auth/me/password',
     withdraw: '/auth/me',
   },
+  tags: {
+    list: '/tags',
+  },
   documents: {
     list: '/documents',
     detail: (id) => `/documents/${id}`,

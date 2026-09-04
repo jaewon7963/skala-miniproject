@@ -11,7 +11,7 @@ import mock from '@/api/mock/handlers'
 export const documentApi = {
   list: (params) => (USE_MOCK ? mock.documents.list(params) : http.get(EP.documents.list, { params })),
   get: (id) => (USE_MOCK ? mock.documents.get(id) : http.get(EP.documents.detail(id))),
-  tags: () => (USE_MOCK ? mock.documents.tags() : Promise.resolve([])),
+  tags: () => (USE_MOCK ? mock.documents.tags() : http.get(EP.tags.list)),
 
   upload: (file, options) => {
     if (USE_MOCK) return mock.documents.upload(file, options)
