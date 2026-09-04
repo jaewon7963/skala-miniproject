@@ -8,13 +8,31 @@
 
 ## 실행
 
-DB부터 띄운다.
+가장 빠른 길은 컨테이너로 통째로 띄우는 것이다. PostgreSQL도 함께 뜨고, 데모 계정
+(`kim@company.com` / `logic1234`)과 AI 검토가 끝난 문서 1건까지 심긴다.
 
 ```bash
-docker compose up -d postgres          # 저장소 루트에서
+docker compose up -d --build backend   # 저장소 루트에서
+docker compose logs -f backend
 ```
 
-이미 로컬에 PostgreSQL이 5432를 쓰고 있다면 도커 대신 그 서버에 롤과 DB만 만들어도 된다.
+아래는 코드를 고쳐 가며 재시작할 때 쓰는 로컬 실행이다. DB부터 띄운다.
+
+```bash
+# 저장소 루트에서 — dev 덧붙임 파일이 5432를 호스트로 열어 준다
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+```
+
+기본 `docker-compose.yml` 은 PostgreSQL 포트를 호스트로 **열지 않는다**(다른 사람 노트북의
+로컬 PostgreSQL과 겹치는 것을 막기 위해서다). 그래서 로컬 실행에는 위처럼 `docker-compose.dev.yml`
+을 얹어야 한다. 5432가 이미 쓰이고 있으면 포트를 바꾼다.
+
+```bash
+POSTGRES_PORT=5433 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+# 이후 실행 시 DB_URL=jdbc:postgresql://localhost:5433/business 를 함께 넘긴다
+```
+
+이미 로컬에 PostgreSQL이 있다면 도커 대신 그 서버에 롤과 DB만 만들어도 된다.
 
 ```sql
 CREATE ROLE business LOGIN PASSWORD 'business';
@@ -47,8 +65,12 @@ DB_PASSWORD=business JWT_SECRET='32바이트 이상 문자열' ./gradlew bootRun
 
 둘 다 없으면 기동 단계에서 placeholder 를 못 채워 실패한다.
 
-그 밖에 덮어쓸 수 있는 값: `DB_URL` · `DB_USERNAME` · `DOCUMENT_STORAGE_DIR`.
+그 밖에 덮어쓸 수 있는 값: `DB_URL` · `DB_USERNAME` · `DOCUMENT_STORAGE_DIR` ·
+`CORS_ALLOWED_ORIGINS` · `DEMO_SEED_ENABLED`.
 `jwt.secret` 은 32바이트 이상이어야 하며, 짧으면 기동 시 거부한다.
+
+`bootRun` 으로 직접 띄우면 데모 계정은 심기지 않는다(`DEMO_SEED_ENABLED` 기본값 `false`).
+빈 DB에서 시작하면서 데모 데이터도 원하면 `DEMO_SEED_ENABLED=true` 를 함께 넘긴다.
 
 ## 프런트엔드와 함께 띄우기
 

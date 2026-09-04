@@ -11,6 +11,10 @@ npm run build
 npm run lint
 ```
 
+전체 스택(프런트 + 백엔드 + DB)을 한 번에 띄우려면 저장소 루트에서 `docker compose up -d --build`.
+데모 계정 `kim@company.com` / `logic1234` 로 로그인하면 AI 검토가 끝난 문서 1건이 들어 있다.
+자세한 조합은 [루트 README](../../README.md) 참고.
+
 ## Mock ↔ 실제 백엔드 전환
 
 이 프로젝트의 화면은 **API 계약(JSON 구조)** 위에서 동작합니다.
