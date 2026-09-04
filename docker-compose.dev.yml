@@ -1,0 +1,17 @@
+# 개발용 덧붙임 파일. 백엔드나 프런트를 컨테이너 밖에서 직접 띄울 때만 쓴다.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+#
+# 기본 docker-compose.yml 은 PostgreSQL 포트를 호스트로 열지 않는다. 평가용 노트북에
+# 로컬 PostgreSQL이 이미 떠 있으면 5432가 겹쳐 스택 전체가 안 뜨기 때문이다.
+# 반대로 ./gradlew bootRun 으로 백엔드를 직접 돌릴 때는 호스트에서 DB가 보여야 해서,
+# 그때만 이 파일을 얹는다.
+#
+# 5432가 이미 쓰이고 있으면:
+#   POSTGRES_PORT=5433 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
+#   cd BE/business && DB_URL=jdbc:postgresql://localhost:5433/business DB_PASSWORD=business JWT_SECRET=... ./gradlew bootRun
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"

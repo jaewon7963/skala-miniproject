@@ -1,3 +1,11 @@
+# 시연·평가용 전체 스택. 클론 직후 `docker compose up -d --build` 한 번이면 된다.
+#
+# 접속:  프런트 http://localhost:5173   ·   백엔드 http://localhost:8081/api/health
+# 데모 계정: kim@company.com / logic1234  (백엔드가 기동하며 문서 1건까지 심는다)
+#
+# 모든 환경변수에 기본값을 박아 두었다. .env 는 .gitignore 대상이라 갓 클론한 저장소에는
+# 없기 때문에, .env 없이도 그대로 떠야 한다.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,8 +16,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-business}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-business}
       TZ: Asia/Seoul
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # 호스트로 5432를 열지 않는다. 평가용 노트북에 로컬 PostgreSQL이 이미 떠 있으면
+    # 포트가 겹쳐 스택 전체가 안 뜨기 때문이다. 백엔드는 compose 네트워크로 붙으므로 필요 없다.
+    # 직접 들여다볼 때는:  docker compose exec postgres psql -U business -d business
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./DB/init:/docker-entrypoint-initdb.d:ro
@@ -20,5 +29,56 @@ services:
       retries: 10
       start_period: 10s
 
+  backend:
+    build:
+      context: ./BE/business
+    container_name: business-backend
+    restart: unless-stopped
+    environment:
+      # 스키마는 Flyway가 만들고 Hibernate는 검증만 한다(ddl-auto=validate).
+      # 그래서 DB가 healthy 가 된 뒤에 떠야 하고, 아래 depends_on 이 그 조건이다.
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-business}
+      DB_USERNAME: ${POSTGRES_USER:-business}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-business}
+      # 로컬 시연용 고정값. 실제 배포에서는 반드시 바꾼다(32바이트 이상이어야 한다).
+      JWT_SECRET: ${JWT_SECRET:-bizxray-local-demo-signing-key-change-me-0123456789}
+      DOCUMENT_STORAGE_DIR: /app/data/documents
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      # 기동 시 데모 계정과 문서 1건을 심는다. 이미 있으면 건너뛴다.
+      DEMO_SEED_ENABLED: "true"
+      DEMO_SEED_EMAIL: ${DEMO_SEED_EMAIL:-kim@company.com}
+      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-logic1234}
+      TZ: Asia/Seoul
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+    volumes:
+      # 업로드한 PDF는 로컬 파일시스템에 쌓인다. 볼륨이 없으면 재시작할 때마다 사라진다.
+      - document_data:/app/data/documents
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./FE/business
+      args:
+        # Vite 환경변수는 빌드 시점에 번들로 들어간다. 런타임에는 못 바꾼다.
+        VITE_USE_MOCK: "false"
+        VITE_API_BASE_URL: /api
+    container_name: business-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  document_data:
