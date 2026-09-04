@@ -22,8 +22,7 @@
 ├─ docs/            API 명세 (api-spec.md), samples/ 시연용 PDF
 ├─ DESIGN.md        디자인 시스템 / 컬러·컴포넌트 명세
 ├─ FRONTEND_TECH.md 프론트엔드 구현 기능 · 기술 상세
-├─ docker-compose.yml      전체 스택(FE + BE + DB) 구동
-└─ docker-compose.dev.yml  개발용 덧붙임 — DB 포트를 호스트로 노출
+└─ docker-compose.yml      전체 스택(FE + BE + DB) 구동 · DB만 따로 띄우기
 ```
 
 ## 시연·평가용 원클릭 실행 (권장)
@@ -63,92 +62,59 @@ docker compose down -v              # 중지 + 초기화 — 다시 올리면 �
 docker compose exec postgres psql -U business -d business   # DB 직접 조회
 ```
 
-> PostgreSQL은 호스트로 포트를 열지 않는다. 평가용 노트북에 로컬 PostgreSQL이 이미 떠 있으면 5432가 겹쳐 스택 전체가 안 뜨기 때문이다.
-> 5173 / 8081이 이미 쓰이고 있다면 `lsof -ti tcp:5173 -ti tcp:8081` 로 확인하거나, `.env.example`을 `.env`로 복사해 `FRONTEND_PORT` / `BACKEND_PORT`를 바꾼다.
+> PostgreSQL은 5432가 아니라 **15432**로 열린다. 개발자 노트북에 로컬 PostgreSQL이 이미 5432에 떠 있는 경우가 흔해서, 겹치지 않는 번호를 쓴다.
+> 5173 / 8081 / 15432가 이미 쓰이고 있다면 `lsof -nP -iTCP:5173 -iTCP:8081 -iTCP:15432 -sTCP:LISTEN` 으로 확인하거나, `.env.example`을 `.env`로 복사해 `FRONTEND_PORT` / `BACKEND_PORT` / `POSTGRES_PORT`를 바꾼다.
 > `JWT_SECRET`은 시연용 고정값이 들어 있다. 실제 배포에서는 반드시 바꾼다.
 
-## 개발용 실행 — 프런트/백엔드를 따로 띄우기
+## 개발용 실행 — 코드를 고쳐 가며 보기
 
-컨테이너 밖에서 코드를 고쳐 가며 볼 때 쓴다. 아래 조합 중 하나를 고르면 된다.
+컨테이너 밖에서 BE·FE를 직접 띄운다. **아래 세 줄이 전부다.** `.env`도, 환경변수도, 추가 플래그도 없다.
 
-| 하고 싶은 것 | 필요한 것 |
+```bash
+# 1) DB만 띄운다 (호스트 15432로 열린다)
+docker compose up -d postgres
+
+# 2) 백엔드 — 새 터미널
+cd BE/business && ./gradlew bootRun          # http://localhost:8081
+
+# 3) 프런트 — 새 터미널
+cd FE/business && npm install && npm run dev  # http://localhost:5173
+```
+
+로그인하면 원클릭 실행과 **똑같이** 데모 계정 `kim@company.com` / `logic1234` 와 검토가 끝난 문서 1건이 들어 있다.
+`bootRun` 이 `dev` 프로파일을 자동으로 켜서 DB 비밀번호·JWT 키·데모 시드를 채워 주기 때문이다
+(`BE/business/src/main/resources/application-dev.properties`).
+
+> **전체 스택 컨테이너와 동시에는 못 띄운다.** `docker compose up -d --build` 로 띄운 프런트·백엔드가
+> 이미 5173·8081을 쓰고 있어서 충돌한다. 개발용으로 넘어갈 때는 `docker compose down` 후 위 세 줄을 쓴다.
+>
+> 컨테이너 백엔드와 호스트 `bootRun` 을 오갈 때는 **`docker compose down -v` 로 한 번 비우는 것이 안전하다.**
+> 업로드된 PDF가 컨테이너는 `document_data` 볼륨에, 호스트는 `BE/business/data/documents` 에 따로 쌓여서
+> DB에는 문서 행이 있는데 파일이 없는 상태가 될 수 있다.
+
+### 백엔드 없이 화면만 보기
+
+```bash
+cd FE/business && npm install && npm run dev:mock
+```
+
+`src/api/mock/` 픽스처로 전 화면이 돈다. 로그인은 아무 이메일 + 8자 이상 비밀번호면 통과한다.
+
+### 포트가 겹칠 때
+
+| 겹치는 포트 | 해결 |
 |---|---|
-| 화면만 훑어보기 (백엔드 없이) | **프런트 A** |
-| 프런트를 고치며 실제 API로 보기 | **프런트 B** + 백엔드 A |
-| 백엔드를 고치며 화면까지 보기 | **백엔드 B** + 프런트 B |
-| 백엔드 API만 curl로 두드리기 | 백엔드 A 또는 B |
+| 15432 (DB) | `POSTGRES_PORT=5433 docker compose up -d postgres` 후 백엔드에 `DB_URL=jdbc:postgresql://localhost:5433/business` 를 넘긴다 |
+| 8081 (BE) | 컨테이너 백엔드가 떠 있는지 확인 — `docker compose down` |
+| 5173 (FE) | 컨테이너 프런트가 떠 있는지 확인 — `docker compose down` |
 
-### 프런트 A · 목업만으로 화면 보기 (백엔드 불필요)
-
-```bash
-cd FE/business
-npm install
-cp .env.example .env      # VITE_USE_MOCK=true 가 기본값
-npm run dev               # http://localhost:5173
-```
-
-`src/api/mock/` 픽스처로 전 화면이 돈다. 로그인은 아무 값이나 통과한다.
-
-### 프런트 B · 실제 백엔드에 붙여서 보기
-
-```bash
-cd FE/business
-npm install
-cp .env.example .env
-# .env 에서 VITE_USE_MOCK 을 false 로 바꾼다
-npm run dev               # http://localhost:5173
-```
-
-Vite dev 서버가 `/api` 를 `VITE_API_PROXY_TARGET`(기본 `http://localhost:8081`)으로 넘긴다.
-백엔드가 A든 B든 8081에 떠 있기만 하면 된다.
-
-> `npm run build` 로 만든 정적 파일에는 `VITE_*` 값이 **박혀서** 나온다. 런타임 환경변수로는 못 바꾼다.
-
-### 백엔드 A · 컨테이너로 띄우기 (가장 간단)
-
-```bash
-docker compose up -d --build backend    # PostgreSQL 은 자동으로 함께 뜬다
-docker compose logs -f backend
-```
-
-`http://localhost:8081/api/health` · 데모 계정과 문서도 그대로 심긴다.
-
-### 백엔드 B · 로컬에서 gradlew 로 띄우기 (코드 고치며 재시작)
-
-DB는 컨테이너로, 애플리케이션만 로컬에서 돌린다. 기본 compose 는 PostgreSQL 포트를 호스트로 열지
-않으므로 **`docker-compose.dev.yml` 을 얹어야 한다.**
-
-```bash
-# 1) DB만 띄운다 (5432를 호스트로 노출)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
-
-# 2) 백엔드 실행
-cd BE/business
-DB_PASSWORD=business \
-JWT_SECRET=bizxray-local-demo-signing-key-change-me-0123456789 \
-./gradlew bootRun         # http://localhost:8081
-```
-
-로컬에 이미 PostgreSQL이 5432를 쓰고 있으면 포트를 바꾼다:
-
-```bash
-POSTGRES_PORT=5433 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
-
-cd BE/business
-DB_URL=jdbc:postgresql://localhost:5433/business \
-DB_PASSWORD=business \
-JWT_SECRET=bizxray-local-demo-signing-key-change-me-0123456789 \
-./gradlew bootRun
-```
-
-> `bootRun` 에는 데모 계정이 **심기지 않는다** (`DEMO_SEED_ENABLED` 기본값이 `false`).
-> 필요하면 `DEMO_SEED_ENABLED=true` 를 함께 넘긴다. 단 `docker compose up` 으로 이미 심어 둔
-> 볼륨을 그대로 쓰는 중이라면 계정이 남아 있으므로 그냥 로그인하면 된다.
+`lsof -nP -iTCP:5173 -iTCP:8081 -iTCP:15432 -sTCP:LISTEN` 으로 누가 쓰는지 볼 수 있다.
 
 ### 테스트
 
 ```bash
-# 스택이 떠 있는 상태에서 — API 기능 63건 점검 (업로드→분석→판정→리포트 전체 흐름)
+# 전체 스택이 떠 있는 상태에서 — API 기능 63건 점검 (업로드→분석→판정→리포트 전체 흐름)
+docker compose up -d --build
 ./scripts/smoke-test.sh
 
 cd BE/business
@@ -163,31 +129,40 @@ cd BE/business
 
 | | 버전 | 언제 필요한가 |
 |---|---|---|
-| Docker Desktop | Compose v2 이상 | 원클릭 실행, 백엔드 A·B |
-| JDK | 17 이상 | 백엔드 B, 테스트 |
-| Node.js | `^20.19` 또는 `>=22.12` | 프런트 A·B |
+| Docker Desktop | Compose v2 이상 | 원클릭 실행, DB 구동 |
+| JDK | 17 이상 | 백엔드 직접 실행, 테스트 |
+| Node.js | `^20.19` 또는 `>=22.12` | 프런트 직접 실행 |
 
 ### 백엔드 환경 변수
 
-| 변수 | 기본값 | 설명 |
+`./gradlew bootRun` 은 `dev` 프로파일이 기본값을 채우므로 **아무것도 넘기지 않아도 된다.**
+아래는 그 기본값을 덮어쓰고 싶을 때만 쓴다. 컨테이너(`java -jar`)에는 `dev` 프로파일이 적용되지 않아
+`DB_PASSWORD` · `JWT_SECRET` 이 없으면 뜨지 않는다 — compose 가 넣어 준다.
+
+| 변수 | `bootRun` 기본값 | 설명 |
 |---|---|---|
-| `DB_URL` | `jdbc:postgresql://localhost:5432/business` | PostgreSQL 접속 URL |
+| `DB_URL` | `jdbc:postgresql://localhost:15432/business` | PostgreSQL 접속 URL |
 | `DB_USERNAME` | `business` | DB 사용자 |
-| `DB_PASSWORD` | (필수, 기본값 없음) | DB 비밀번호 — compose 기본값과 맞추려면 `business` |
-| `JWT_SECRET` | (필수, 기본값 없음) | JWT 서명 키 — **32바이트 이상** |
+| `DB_PASSWORD` | `business` | DB 비밀번호 (컨테이너에서는 필수) |
+| `JWT_SECRET` | 시연용 고정값 | JWT 서명 키 — **32바이트 이상** (컨테이너에서는 필수) |
 | `DOCUMENT_STORAGE_DIR` | `./data/documents` | 업로드 문서 저장 경로 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 브라우저가 8081을 직접 호출할 때 허용할 오리진 |
-| `DEMO_SEED_ENABLED` | `false` | 기동 시 데모 계정·문서를 심을지 (compose 에서만 `true`) |
+| `DEMO_SEED_ENABLED` | `true` | 기동 시 데모 계정·문서를 심을지 |
 
-`DB_PASSWORD` 와 `JWT_SECRET` 은 기본값이 없어서 **없으면 애플리케이션이 아예 뜨지 않는다.**
+개인 시크릿으로 덮어쓰려면 `BE/business/src/main/resources/application-local.properties`(`.gitignore` 대상)를
+만들고 `SPRING_PROFILES_ACTIVE=dev,local ./gradlew bootRun` 으로 함께 켠다.
 
-### 프런트엔드 환경 변수 (`FE/business/.env`)
+### 프런트엔드 환경 변수
+
+기본값만으로 `npm run dev` 가 실제 백엔드에 붙으므로 `.env` 는 필요 없다. 바꾸려면 `cp .env.example .env`.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `VITE_USE_MOCK` | `true` | `true` = 목업 데이터, `false` = 실제 API |
+| `VITE_USE_MOCK` | `false` (`dev:mock` 은 `true`) | `true` = 목업 데이터, `false` = 실제 API |
 | `VITE_API_BASE_URL` | `/api` | API 기본 경로 |
 | `VITE_API_PROXY_TARGET` | `http://localhost:8081` | dev 서버가 `/api` 를 넘길 대상 |
+
+`npm run build` 로 만든 정적 파일에는 `VITE_*` 값이 **박혀서** 나온다. 런타임 환경변수로는 못 바꾼다.
 
 ## 문서
 
