@@ -102,14 +102,20 @@
 | 16 | GET | `/review-jobs/{jobId}/pages` | 원문 페이지(파싱 결과) | ✔ | MVP1 |
 | 17 | GET | `/review-jobs/{jobId}/findings` | 검토 항목 목록 | ✔ | MVP1 |
 | 18 | PATCH | `/review-jobs/{jobId}/findings/{findingId}/verdict` | 판정 | ✔ | MVP1 |
-| 19 | GET | `/review-jobs/{jobId}/annotations` | 주석 목록 | ✔ | MVP1 |
-| 20 | POST | `/review-jobs/{jobId}/annotations` | 주석 생성 | ✔ | MVP1 |
-| 21 | PATCH | `/annotations/{annotationId}` | 주석 수정 | ✔ | MVP1 |
-| 22 | DELETE | `/annotations/{annotationId}` | 주석 삭제 | ✔ | MVP1 |
+| 19 | GET | `/review-jobs/{jobId}/annotations` | 주석 목록 | ✔ | **미구현** |
+| 20 | POST | `/review-jobs/{jobId}/annotations` | 주석 생성 | ✔ | **미구현** |
+| 21 | PATCH | `/annotations/{annotationId}` | 주석 수정 | ✔ | **미구현** |
+| 22 | DELETE | `/annotations/{annotationId}` | 주석 삭제 | ✔ | **미구현** |
 | 23 | POST | `/review-jobs/{jobId}/complete` | 검토 완료 확정 | ✔ | MVP1 |
-| 24 | GET | `/review-jobs/{jobId}/export` | 요약 내보내기 (주석·하이라이트 반영 PDF) | ✔ | MVP1 |
+| 24 | GET | `/review-jobs/{jobId}/export` | 요약 내보내기 (주석·하이라이트 반영 PDF) | ✔ | **미구현** |
 | 25 | POST | `/review-jobs/{jobId}/questions` | AI 질문 | ✔ | 미결 |
 | 26 | GET | `/review-jobs/{jobId}/report` | 검토 의견서 데이터 | ✔ | MVP2 |
+
+**미구현 표시**: 19~22(주석)·24(내보내기)는 표에만 있고 컨트롤러가 없다. 프런트도 호출하지 않는다.
+실제로 매핑된 경로는 서버를 띄운 뒤 <http://localhost:8081/swagger-ui.html> 또는 `./scripts/check-endpoints.sh` 로 확인하는 편이 정확하다.
+
+**표에 없지만 구현된 것**: `GET /tags`, `GET /api/health`, `PATCH /documents/{documentId}`(제목·태그 동시 수정),
+`GET /documents/{documentId}` 의 `/parse-status` · `/file` · `/sections` · `/pages`, 그리고 `/api/users/**` 5개(레거시).
 
 **회의 결정으로 제외된 것**: `GET /folders`(폴더 기능 제외), OAuth 로그인, 이름(`name`) 필드.
 
